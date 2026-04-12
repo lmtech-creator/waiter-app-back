@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/waiter/back/application/usecase"
 	"github.com/waiter/back/domain/entity"
+	"github.com/waiter/back/interfaces/http/dto"
 )
 
 type RequestHandler struct {
@@ -22,25 +23,28 @@ func NewRequestHandler(uc *usecase.RequestUseCase) *RequestHandler {
 // @Tags         requests
 // @Accept       json
 // @Produce      json
-// @Param        request  body      usecase.CreateRequestInput  true  "Datos de la solicitud"
-// @Success      201      {object}  entity.Request
-// @Failure      400      {object}  map[string]string
-// @Failure      422      {object}  map[string]string
+// @Param        request  body      dto.CreateRequestRequest  true  "Datos de la solicitud"
+// @Success      201      {object}  dto.RequestResponse
+// @Failure      400      {object}  dto.ErrorResponse
+// @Failure      422      {object}  dto.ErrorResponse
 // @Router       /api/v1/requests [post]
 func (h *RequestHandler) Create(c *gin.Context) {
-	var input usecase.CreateRequestInput
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+	var req dto.CreateRequestRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "validation_error", Message: err.Error()})
 		return
 	}
 
-	req, err := h.uc.CreateRequest(input)
+	result, err := h.uc.CreateRequest(usecase.CreateRequestInput{
+		TableID: req.TableID,
+		Type:    req.Type,
+	})
 	if err != nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "unprocessable_entity", "message": err.Error()})
+		c.JSON(http.StatusUnprocessableEntity, dto.ErrorResponse{Error: "unprocessable_entity", Message: err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, req)
+	c.JSON(http.StatusCreated, dto.ToRequestResponse(result))
 }
 
 // GetActive godoc
@@ -49,23 +53,19 @@ func (h *RequestHandler) Create(c *gin.Context) {
 // @Tags         requests
 // @Produce      json
 // @Param        restaurantId  path      string  true  "ID del restaurante"
-// @Success      200           {array}   entity.Request
-// @Failure      500           {object}  map[string]string
+// @Success      200           {array}   dto.RequestResponse
+// @Failure      500           {object}  dto.ErrorResponse
 // @Router       /api/v1/restaurants/{restaurantId}/requests/active [get]
 func (h *RequestHandler) GetActive(c *gin.Context) {
 	restaurantID := c.Param("restaurantId")
 
 	requests, err := h.uc.GetActiveRequests(restaurantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "failed to retrieve requests"})
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "internal_error", Message: "failed to retrieve requests"})
 		return
 	}
 
-	c.JSON(http.StatusOK, requests)
-}
-
-type updateRequestInput struct {
-	Status entity.RequestStatus `json:"status" binding:"required"`
+	c.JSON(http.StatusOK, dto.ToRequestListResponse(requests))
 }
 
 // Complete godoc
@@ -74,28 +74,28 @@ type updateRequestInput struct {
 // @Tags         requests
 // @Accept       json
 // @Produce      json
-// @Param        requestId  path      string              true  "ID de la solicitud"
-// @Param        request    body      updateRequestInput   true  "Nuevo estado"
+// @Param        requestId  path      string                        true  "ID de la solicitud"
+// @Param        request    body      dto.UpdateRequestStatusRequest  true  "Nuevo estado"
 // @Success      204
-// @Failure      400        {object}  map[string]string
-// @Failure      422        {object}  map[string]string
+// @Failure      400        {object}  dto.ErrorResponse
+// @Failure      422        {object}  dto.ErrorResponse
 // @Router       /api/v1/requests/{requestId} [patch]
 func (h *RequestHandler) Complete(c *gin.Context) {
 	id := c.Param("requestId")
 
-	var input updateRequestInput
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+	var req dto.UpdateRequestStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "validation_error", Message: err.Error()})
 		return
 	}
 
-	if input.Status != entity.Done {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "invalid_status", "message": "only DONE status transition is supported"})
+	if req.Status != entity.Done {
+		c.JSON(http.StatusUnprocessableEntity, dto.ErrorResponse{Error: "invalid_status", Message: "only DONE status transition is supported"})
 		return
 	}
 
 	if err := h.uc.CompleteRequest(id); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "unprocessable_entity", "message": err.Error()})
+		c.JSON(http.StatusUnprocessableEntity, dto.ErrorResponse{Error: "unprocessable_entity", Message: err.Error()})
 		return
 	}
 
@@ -108,17 +108,17 @@ func (h *RequestHandler) Complete(c *gin.Context) {
 // @Tags         requests
 // @Produce      json
 // @Param        tableId  path      string  true  "ID de la mesa"
-// @Success      200      {array}   entity.Request
-// @Failure      500      {object}  map[string]string
+// @Success      200      {array}   dto.RequestResponse
+// @Failure      500      {object}  dto.ErrorResponse
 // @Router       /api/v1/tables/{tableId}/status [get]
 func (h *RequestHandler) GetTableStatus(c *gin.Context) {
 	tableID := c.Param("tableId")
 
 	requests, err := h.uc.GetTableStatus(tableID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "failed to retrieve table status"})
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "internal_error", Message: "failed to retrieve table status"})
 		return
 	}
 
-	c.JSON(http.StatusOK, requests)
+	c.JSON(http.StatusOK, dto.ToRequestListResponse(requests))
 }

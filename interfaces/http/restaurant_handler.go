@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/waiter/back/application/usecase"
+	"github.com/waiter/back/interfaces/http/dto"
 )
 
 type RestaurantHandler struct {
@@ -21,25 +22,28 @@ func NewRestaurantHandler(uc *usecase.RestaurantUseCase) *RestaurantHandler {
 // @Tags         restaurants
 // @Accept       json
 // @Produce      json
-// @Param        request  body      usecase.CreateRestaurantInput  true  "Datos del restaurante"
-// @Success      201      {object}  entity.Restaurant
-// @Failure      400      {object}  map[string]string
-// @Failure      422      {object}  map[string]string
+// @Param        request  body      dto.CreateRestaurantRequest  true  "Datos del restaurante"
+// @Success      201      {object}  dto.RestaurantResponse
+// @Failure      400      {object}  dto.ErrorResponse
+// @Failure      422      {object}  dto.ErrorResponse
 // @Router       /api/v1/restaurants [post]
 func (h *RestaurantHandler) Create(c *gin.Context) {
-	var input usecase.CreateRestaurantInput
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+	var req dto.CreateRestaurantRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "validation_error", Message: err.Error()})
 		return
 	}
 
-	r, err := h.uc.CreateRestaurant(input)
+	r, err := h.uc.CreateRestaurant(usecase.CreateRestaurantInput{
+		Name: req.Name,
+		Plan: req.Plan,
+	})
 	if err != nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "unprocessable_entity", "message": err.Error()})
+		c.JSON(http.StatusUnprocessableEntity, dto.ErrorResponse{Error: "unprocessable_entity", Message: err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, r)
+	c.JSON(http.StatusCreated, dto.ToRestaurantResponse(r))
 }
 
 // Get godoc
@@ -48,23 +52,19 @@ func (h *RestaurantHandler) Create(c *gin.Context) {
 // @Tags         restaurants
 // @Produce      json
 // @Param        restaurantId  path      string  true  "ID del restaurante"
-// @Success      200           {object}  entity.Restaurant
-// @Failure      404           {object}  map[string]string
+// @Success      200           {object}  dto.RestaurantResponse
+// @Failure      404           {object}  dto.ErrorResponse
 // @Router       /api/v1/restaurants/{restaurantId} [get]
 func (h *RestaurantHandler) Get(c *gin.Context) {
 	id := c.Param("restaurantId")
 
 	r, err := h.uc.GetRestaurant(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "restaurant not found"})
+		c.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "not_found", Message: "restaurant not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, r)
-}
-
-type createTableInput struct {
-	Number int `json:"number" binding:"required"`
+	c.JSON(http.StatusOK, dto.ToRestaurantResponse(r))
 }
 
 // CreateTable godoc
@@ -73,31 +73,31 @@ type createTableInput struct {
 // @Tags         tables
 // @Accept       json
 // @Produce      json
-// @Param        restaurantId  path      string            true  "ID del restaurante"
-// @Param        request       body      createTableInput  true  "Datos de la mesa"
-// @Success      201           {object}  entity.Table
-// @Failure      400           {object}  map[string]string
-// @Failure      422           {object}  map[string]string
+// @Param        restaurantId  path      string                  true  "ID del restaurante"
+// @Param        request       body      dto.CreateTableRequest  true  "Datos de la mesa"
+// @Success      201           {object}  dto.TableResponse
+// @Failure      400           {object}  dto.ErrorResponse
+// @Failure      422           {object}  dto.ErrorResponse
 // @Router       /api/v1/restaurants/{restaurantId}/tables [post]
 func (h *RestaurantHandler) CreateTable(c *gin.Context) {
 	restaurantID := c.Param("restaurantId")
 
-	var input createTableInput
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "validation_error", "message": err.Error()})
+	var req dto.CreateTableRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "validation_error", Message: err.Error()})
 		return
 	}
 
 	t, err := h.uc.CreateTable(usecase.CreateTableInput{
-		Number:       input.Number,
+		Number:       req.Number,
 		RestaurantID: restaurantID,
 	})
 	if err != nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "unprocessable_entity", "message": err.Error()})
+		c.JSON(http.StatusUnprocessableEntity, dto.ErrorResponse{Error: "unprocessable_entity", Message: err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, t)
+	c.JSON(http.StatusCreated, dto.ToTableResponse(t))
 }
 
 // GetTables godoc
@@ -106,17 +106,17 @@ func (h *RestaurantHandler) CreateTable(c *gin.Context) {
 // @Tags         tables
 // @Produce      json
 // @Param        restaurantId  path      string  true  "ID del restaurante"
-// @Success      200           {array}   entity.Table
-// @Failure      500           {object}  map[string]string
+// @Success      200           {array}   dto.TableResponse
+// @Failure      500           {object}  dto.ErrorResponse
 // @Router       /api/v1/restaurants/{restaurantId}/tables [get]
 func (h *RestaurantHandler) GetTables(c *gin.Context) {
 	restaurantID := c.Param("restaurantId")
 
 	tables, err := h.uc.GetTables(restaurantID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "failed to retrieve tables"})
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "internal_error", Message: "failed to retrieve tables"})
 		return
 	}
 
-	c.JSON(http.StatusOK, tables)
+	c.JSON(http.StatusOK, dto.ToTableListResponse(tables))
 }
