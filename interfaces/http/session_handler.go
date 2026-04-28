@@ -15,12 +15,17 @@ import (
 
 // SessionHandler handles customer session creation via QR code.
 type SessionHandler struct {
-	tableRepo repository.TableRepository
-	secret    []byte
+	tableRepo   repository.TableRepository
+	secret      []byte
+	signSession func(claims auth.SessionClaims, secret []byte) (string, error)
 }
 
 func NewSessionHandler(tableRepo repository.TableRepository, secret []byte) *SessionHandler {
-	return &SessionHandler{tableRepo: tableRepo, secret: secret}
+	return &SessionHandler{
+		tableRepo:   tableRepo,
+		secret:      secret,
+		signSession: auth.SignSession,
+	}
 }
 
 // Create godoc
@@ -68,7 +73,7 @@ func (h *SessionHandler) Create(c *gin.Context) {
 		},
 	}
 
-	token, err := auth.SignSession(claims, h.secret)
+	token, err := h.signSession(claims, h.secret)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error interno."})
 		return

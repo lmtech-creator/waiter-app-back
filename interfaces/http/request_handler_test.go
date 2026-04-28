@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/waiter/back/application/usecase"
@@ -243,5 +244,49 @@ func TestRequestHandler_GetTableStatus_RepoError(t *testing.T) {
 
 	if w.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestRequestHandler_Create_CooldownRejected(t *testing.T) {
+	handler, requestRepo, _, _ := setupRequestRouter()
+	requestRepo.FindLastCreatedByTableFn = func(tableID string) (*entity.Request, error) {
+		return &entity.Request{
+			ID:        "prev",
+			TableID:   tableID,
+			CreatedAt: time.Now().Add(-5 * time.Second),
+		}, nil
+	}
+
+	body, _ := json.Marshal(map[string]any{"type": "CALL_WAITER"})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/requests", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	injectClaims(c, "t1", "r1", 1)
+
+	handler.Create(c)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Errorf("expected 429, got %d: %s", w.Code, w.Body.String())
+	}
+	if w.Header().Get("Retry-After") == "" {
+		t.Error("expected Retry-After header to be set")
+	}
+}
+
+func TestRequestHandler_Create_InvalidType(t *testing.T) {
+	handler, _, _, _ := setupRequestRouter()
+
+	body, _ := json.Marshal(map[string]any{"type": "INVALID_TYPE"})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/requests", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	injectClaims(c, "t1", "r1", 1)
+
+	handler.Create(c)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
 	}
 }

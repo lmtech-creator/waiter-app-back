@@ -179,3 +179,53 @@ func TestGetTables_RepoError(t *testing.T) {
 		t.Fatal("expected error from repo failure")
 	}
 }
+
+func TestRegenerateQR_Success(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", QRCode: "OLDQRCODE"}
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	newCode, err := uc.RegenerateQR("t1")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if newCode == "" {
+		t.Error("expected non-empty new QR code")
+	}
+	if newCode == "OLDQRCODE" {
+		t.Error("expected new QR code to differ from old one")
+	}
+	if len(newCode) != 10 {
+		t.Errorf("expected QR code of length 10, got %d", len(newCode))
+	}
+	if tableRepo.Tables["t1"].QRCode != newCode {
+		t.Error("expected table QRCode to be updated in repo")
+	}
+}
+
+func TestRegenerateQR_TableNotFound(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	_, err := uc.RegenerateQR("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for nonexistent table")
+	}
+}
+
+func TestRegenerateQR_UpdateError(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", QRCode: "OLDCODE01"}
+	tableRepo.UpdateQRCodeFn = func(id, qrCode string) error {
+		return fmt.Errorf("db error")
+	}
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	_, err := uc.RegenerateQR("t1")
+	if err == nil {
+		t.Fatal("expected error from update failure")
+	}
+}

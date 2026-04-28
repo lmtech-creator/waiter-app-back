@@ -32,16 +32,21 @@ func getLimiter(ip string) *rate.Limiter {
 	return l.limiter
 }
 
+// purgeStaleLimiters removes entries not seen in the last 10 minutes.
+func purgeStaleLimiters() {
+	mu.Lock()
+	for ip, l := range limiters {
+		if time.Since(l.lastSeen) > 10*time.Minute {
+			delete(limiters, ip)
+		}
+	}
+	mu.Unlock()
+}
+
 // StartLimiterCleanup removes stale IP entries every 5 minutes. Call in a goroutine from main.
 func StartLimiterCleanup() {
 	for range time.Tick(5 * time.Minute) {
-		mu.Lock()
-		for ip, l := range limiters {
-			if time.Since(l.lastSeen) > 10*time.Minute {
-				delete(limiters, ip)
-			}
-		}
-		mu.Unlock()
+		purgeStaleLimiters()
 	}
 }
 

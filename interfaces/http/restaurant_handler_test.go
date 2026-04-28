@@ -217,3 +217,60 @@ func TestRestaurantHandler_GetTables_RepoError(t *testing.T) {
 		t.Errorf("expected 500, got %d", w.Code)
 	}
 }
+
+func TestRestaurantHandler_RegenerateQR_Success(t *testing.T) {
+	handler, _, tableRepo := setupRestaurantRouter()
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", Number: 1, QRCode: "OLDCODE123"}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/admin/tables/t1/regenerate-qr", nil)
+	c.Params = gin.Params{{Key: "id", Value: "t1"}}
+
+	handler.RegenerateQR(c)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp["qr_code"] == "" {
+		t.Error("expected non-empty qr_code in response")
+	}
+}
+
+func TestRestaurantHandler_RegenerateQR_NotFound(t *testing.T) {
+	handler, _, _ := setupRestaurantRouter()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/admin/tables/nonexistent/regenerate-qr", nil)
+	c.Params = gin.Params{{Key: "id", Value: "nonexistent"}}
+
+	handler.RegenerateQR(c)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestRestaurantHandler_RegenerateQR_UpdateError(t *testing.T) {
+	handler, _, tableRepo := setupRestaurantRouter()
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", QRCode: "OLDCODE01"}
+	tableRepo.UpdateQRCodeFn = func(id, qrCode string) error {
+		return fmt.Errorf("db error")
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/admin/tables/t1/regenerate-qr", nil)
+	c.Params = gin.Params{{Key: "id", Value: "t1"}}
+
+	handler.RegenerateQR(c)
+
+	if w.Code != http.StatusInternalServerError {
+		t.Errorf("expected 500, got %d", w.Code)
+	}
+}

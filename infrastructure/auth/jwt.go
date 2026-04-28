@@ -21,18 +21,17 @@ func SignSession(claims SessionClaims, secret []byte) (string, error) {
 }
 
 // VerifySession parses and validates a JWT, returning the claims.
+// Algorithm is restricted to HS256 via WithValidMethods; the key function
+// returns the secret unconditionally after that check.
 func VerifySession(tokenStr string, secret []byte) (*SessionClaims, error) {
 	token, err := jwt.ParseWithClaims(tokenStr, &SessionClaims{},
 		func(t *jwt.Token) (interface{}, error) {
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-			}
 			return secret, nil
 		},
 		jwt.WithValidMethods([]string{"HS256"}),
 		jwt.WithExpirationRequired(),
 	)
-	if err != nil || !token.Valid {
+	if err != nil {
 		return nil, fmt.Errorf("invalid token")
 	}
 	return token.Claims.(*SessionClaims), nil

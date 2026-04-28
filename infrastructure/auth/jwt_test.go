@@ -1,0 +1,106 @@
+package auth
+
+import (
+	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+)
+
+var testSecret = []byte("test-secret-32bytes-long-enough!!")
+
+func makeClaims(expOffset time.Duration) SessionClaims {
+	return SessionClaims{
+		TableID:      "t1",
+		RestaurantID: "r1",
+		TableNumber:  5,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expOffset)),
+		},
+	}
+}
+
+func TestSignSession_Success(t *testing.T) {
+	claims := makeClaims(30 * time.Minute)
+	token, err := SignSession(claims, testSecret)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if token == "" {
+		t.Error("expected non-empty token string")
+	}
+}
+
+func TestVerifySession_Valid(t *testing.T) {
+	claims := makeClaims(30 * time.Minute)
+	token, _ := SignSession(claims, testSecret)
+
+	got, err := VerifySession(token, testSecret)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.TableID != "t1" {
+		t.Errorf("expected TableID t1, got %s", got.TableID)
+	}
+	if got.RestaurantID != "r1" {
+		t.Errorf("expected RestaurantID r1, got %s", got.RestaurantID)
+	}
+	if got.TableNumber != 5 {
+		t.Errorf("expected TableNumber 5, got %d", got.TableNumber)
+	}
+}
+
+func TestVerifySession_Expired(t *testing.T) {
+	claims := makeClaims(-1 * time.Minute)
+	token, _ := SignSession(claims, testSecret)
+
+	_, err := VerifySession(token, testSecret)
+	if err == nil {
+		t.Fatal("expected error for expired token")
+	}
+}
+
+func TestVerifySession_WrongAlgorithm(t *testing.T) {
+	// HS384 is not in the allowed list (only HS256).
+	claims := makeClaims(30 * time.Minute)
+	tk := jwt.NewWithClaims(jwt.SigningMethodHS384, claims)
+	signed, _ := tk.SignedString(testSecret)
+
+	_, err := VerifySession(signed, testSecret)
+	if err == nil {
+		t.Fatal("expected error for disallowed algorithm")
+	}
+}
+
+func TestVerifySession_WrongSecret(t *testing.T) {
+	claims := makeClaims(30 * time.Minute)
+	token, _ := SignSession(claims, testSecret)
+
+	_, err := VerifySession(token, []byte("wrong-secret-32bytes-also-enough!"))
+	if err == nil {
+		t.Fatal("expected error for wrong secret")
+	}
+}
+
+func TestVerifySession_InvalidTokenString(t *testing.T) {
+	_, err := VerifySession("not.a.valid.jwt.at.all", testSecret)
+	if err == nil {
+		t.Fatal("expected error for invalid token string")
+	}
+}
+
+func TestVerifySession_NoExpiry(t *testing.T) {
+	// WithExpirationRequired must reject a token that has no ExpiresAt.
+	claims := SessionClaims{
+		TableID:      "t1",
+		RestaurantID: "r1",
+		TableNumber:  5,
+	}
+	tk := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, _ := tk.SignedString(testSecret)
+
+	_, err := VerifySession(signed, testSecret)
+	if err == nil {
+		t.Fatal("expected error for token without expiry")
+	}
+}

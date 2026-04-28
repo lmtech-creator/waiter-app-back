@@ -1,8 +1,10 @@
 package usecase
 
 import (
+	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/waiter/back/domain/entity"
 	"github.com/waiter/back/mocks"
@@ -249,5 +251,93 @@ func TestGetTableStatus_RepoError(t *testing.T) {
 	_, err := uc.GetTableStatus("t1")
 	if err == nil {
 		t.Fatal("expected error from repo failure")
+	}
+}
+
+func TestCooldownError_Error(t *testing.T) {
+	err := &CooldownError{SecondsRemaining: 10}
+	expected := "cooldown: wait 10 seconds"
+	if err.Error() != expected {
+		t.Errorf("expected %q, got %q", expected, err.Error())
+	}
+}
+
+func TestCreateRequest_CooldownActive(t *testing.T) {
+	tableRepo := mocks.NewTableRepo()
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1"}
+
+	requestRepo := mocks.NewRequestRepo()
+	requestRepo.FindLastCreatedByTableFn = func(tableID string) (*entity.Request, error) {
+		return &entity.Request{
+			ID:        "prev",
+			TableID:   tableID,
+			CreatedAt: time.Now().Add(-5 * time.Second), // 5s ago — within 15s cooldown
+		}, nil
+	}
+
+	notifier := mocks.NewNotifier()
+	uc := NewRequestUseCase(requestRepo, tableRepo, notifier)
+
+	_, err := uc.CreateRequest(CreateRequestInput{TableID: "t1", Type: entity.CallWaiter})
+	if err == nil {
+		t.Fatal("expected cooldown error")
+	}
+	var cooldownErr *CooldownError
+	if !errors.As(err, &cooldownErr) {
+		t.Fatalf("expected *CooldownError, got %T: %v", err, err)
+	}
+	if cooldownErr.SecondsRemaining <= 0 {
+		t.Errorf("expected positive seconds remaining, got %d", cooldownErr.SecondsRemaining)
+	}
+}
+
+func TestCreateRequest_CooldownExpired(t *testing.T) {
+	tableRepo := mocks.NewTableRepo()
+
+	requestRepo := mocks.NewRequestRepo()
+	requestRepo.FindLastCreatedByTableFn = func(tableID string) (*entity.Request, error) {
+		return &entity.Request{
+			ID:        "prev",
+			TableID:   tableID,
+			CreatedAt: time.Now().Add(-20 * time.Second), // 20s ago — past cooldown
+		}, nil
+	}
+
+	notifier := mocks.NewNotifier()
+	uc := NewRequestUseCase(requestRepo, tableRepo, notifier)
+
+	// Provide restaurantID directly so table lookup is skipped.
+	req, err := uc.CreateRequest(CreateRequestInput{TableID: "t1", RestaurantID: "r1", Type: entity.CallWaiter})
+	if err != nil {
+		t.Fatalf("expected no error after cooldown expired, got %v", err)
+	}
+	if req.Type != entity.CallWaiter {
+		t.Errorf("expected CALL_WAITER, got %s", req.Type)
+	}
+}
+
+func TestCreateRequest_RestaurantIDFromInput(t *testing.T) {
+	// When RestaurantID is provided in input (from JWT claims), table lookup is skipped.
+	tableRepo := mocks.NewTableRepo() // intentionally empty
+	requestRepo := mocks.NewRequestRepo()
+	notifier := mocks.NewNotifier()
+	uc := NewRequestUseCase(requestRepo, tableRepo, notifier)
+
+	req, err := uc.CreateRequest(CreateRequestInput{
+		TableID:      "t1",
+		RestaurantID: "r1",
+		Type:         entity.CallWaiter,
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(notifier.Events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(notifier.Events))
+	}
+	if notifier.Events[0].RestaurantID != "r1" {
+		t.Errorf("expected restaurant r1, got %s", notifier.Events[0].RestaurantID)
+	}
+	if req.TableID != "t1" {
+		t.Errorf("expected table_id t1, got %s", req.TableID)
 	}
 }
