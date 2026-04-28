@@ -270,7 +270,7 @@ func TestRequestHandler_Create_CooldownRejected(t *testing.T) {
 		t.Errorf("expected 429, got %d: %s", w.Code, w.Body.String())
 	}
 	if w.Header().Get("Retry-After") == "" {
-		t.Error("expected Retry-After header to be set")
+		t.Error("expected Retry-After header")
 	}
 }
 
@@ -290,3 +290,4 @@ func TestRequestHandler_Create_InvalidType(t *testing.T) {
 		t.Errorf("expected 400, got %d", w.Code)
 	}
 }
+

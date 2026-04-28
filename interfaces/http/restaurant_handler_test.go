@@ -258,7 +258,7 @@ func TestRestaurantHandler_RegenerateQR_NotFound(t *testing.T) {
 
 func TestRestaurantHandler_RegenerateQR_UpdateError(t *testing.T) {
 	handler, _, tableRepo := setupRestaurantRouter()
-	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", QRCode: "OLDCODE01"}
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", QRCode: "OLD1234567"}
 	tableRepo.UpdateQRCodeFn = func(id, qrCode string) error {
 		return fmt.Errorf("db error")
 	}
@@ -274,3 +274,4 @@ func TestRestaurantHandler_RegenerateQR_UpdateError(t *testing.T) {
 		t.Errorf("expected 500, got %d", w.Code)
 	}
 }
+
