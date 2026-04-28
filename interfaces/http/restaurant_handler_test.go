@@ -274,4 +274,3 @@ func TestRestaurantHandler_RegenerateQR_UpdateError(t *testing.T) {
 		t.Errorf("expected 500, got %d", w.Code)
 	}
 }
-

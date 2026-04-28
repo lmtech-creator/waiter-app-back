@@ -290,4 +290,3 @@ func TestRequestHandler_Create_InvalidType(t *testing.T) {
 		t.Errorf("expected 400, got %d", w.Code)
 	}
 }
-
