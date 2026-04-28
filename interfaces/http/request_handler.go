@@ -1,12 +1,17 @@
 package http
 
 import (
+	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/waiter/back/application/usecase"
 	"github.com/waiter/back/domain/entity"
 	"github.com/waiter/back/interfaces/http/dto"
+	mw "github.com/waiter/back/interfaces/http/middleware"
+	"go.uber.org/zap"
 )
 
 type RequestHandler struct {
@@ -19,14 +24,17 @@ func NewRequestHandler(uc *usecase.RequestUseCase) *RequestHandler {
 
 // Create godoc
 // @Summary      Crear solicitud
-// @Description  Crea una nueva solicitud de mesa (llamar mozo, pedir cuenta, ayuda)
+// @Description  Crea una nueva solicitud de mesa (llamar mozo, pedir cuenta, ayuda). Requiere JWT de sesión.
 // @Tags         requests
 // @Accept       json
 // @Produce      json
-// @Param        request  body      dto.CreateRequestRequest  true  "Datos de la solicitud"
-// @Success      201      {object}  dto.RequestResponse
-// @Failure      400      {object}  dto.ErrorResponse
-// @Failure      422      {object}  dto.ErrorResponse
+// @Param        Authorization  header    string                    true  "Bearer <session_token>"
+// @Param        request        body      dto.CreateRequestRequest  true  "Tipo de solicitud"
+// @Success      201            {object}  dto.RequestResponse
+// @Failure      400            {object}  dto.ErrorResponse
+// @Failure      401            {object}  map[string]string
+// @Failure      422            {object}  dto.ErrorResponse
+// @Failure      429            {object}  dto.ErrorResponse
 // @Router       /api/v1/requests [post]
 func (h *RequestHandler) Create(c *gin.Context) {
 	var req dto.CreateRequestRequest
@@ -35,15 +43,48 @@ func (h *RequestHandler) Create(c *gin.Context) {
 		return
 	}
 
+	claims := mw.GetClaims(c)
+	if claims == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No autorizado."})
+		return
+	}
+
+	ip := mw.RealIP(c)
+
 	result, err := h.uc.CreateRequest(usecase.CreateRequestInput{
-		TableID: req.TableID,
-		Type:    req.Type,
+		TableID:      claims.TableID,
+		RestaurantID: claims.RestaurantID,
+		Type:         req.Type,
 	})
 	if err != nil {
+		var cooldownErr *usecase.CooldownError
+		if errors.As(err, &cooldownErr) {
+			zap.L().Warn("cooldown rejected",
+				zap.String("table_id", claims.TableID),
+				zap.String("ip", ip),
+				zap.Int("seconds_remaining", cooldownErr.SecondsRemaining),
+			)
+			c.Header("Retry-After", strconv.Itoa(cooldownErr.SecondsRemaining))
+			c.JSON(http.StatusTooManyRequests, dto.ErrorResponse{Error: "too_many_requests", Message: "Esperá unos segundos antes de enviar otra solicitud."})
+			return
+		}
+		if strings.Contains(err.Error(), "invalid request type") {
+			zap.L().Warn("invalid request type",
+				zap.String("type", string(req.Type)),
+				zap.String("ip", ip),
+			)
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "bad_request", Message: "Tipo de solicitud inválido."})
+			return
+		}
 		c.JSON(http.StatusUnprocessableEntity, dto.ErrorResponse{Error: "unprocessable_entity", Message: err.Error()})
 		return
 	}
 
+	zap.L().Info("request created",
+		zap.String("type", string(req.Type)),
+		zap.Int("table", claims.TableNumber),
+		zap.String("ip", ip),
+	)
 	c.JSON(http.StatusCreated, dto.ToRequestResponse(result))
 }
 

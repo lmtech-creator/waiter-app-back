@@ -8,6 +8,19 @@ import (
 
 // ─── Request DTOs ───
 
+type SessionRequest struct {
+	QRCode string `json:"qr_code"`
+}
+
+type SessionResponse struct {
+	SessionToken string      `json:"session_token"`
+	Table        TablePublic `json:"table"`
+}
+
+type TablePublic struct {
+	Number int `json:"number"`
+}
+
 type CreateRestaurantRequest struct {
 	Name string `json:"name" binding:"required"`
 	Plan string `json:"plan"`
@@ -18,8 +31,7 @@ type CreateTableRequest struct {
 }
 
 type CreateRequestRequest struct {
-	TableID string             `json:"table_id" binding:"required"`
-	Type    entity.RequestType `json:"type" binding:"required"`
+	Type entity.RequestType `json:"type" binding:"required"`
 }
 
 type UpdateRequestStatusRequest struct {

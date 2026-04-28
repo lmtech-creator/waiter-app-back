@@ -11,7 +11,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/waiter/back/application/usecase"
 	"github.com/waiter/back/domain/entity"
+	"github.com/waiter/back/infrastructure/auth"
 	"github.com/waiter/back/interfaces/http/dto"
+	mw "github.com/waiter/back/interfaces/http/middleware"
 	"github.com/waiter/back/mocks"
 )
 
@@ -24,15 +26,23 @@ func setupRequestRouter() (*RequestHandler, *mocks.RequestRepo, *mocks.TableRepo
 	return handler, requestRepo, tableRepo, notifier
 }
 
-func TestRequestHandler_Create_Success(t *testing.T) {
-	handler, _, tableRepo, _ := setupRequestRouter()
-	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1"}
+func injectClaims(c *gin.Context, tableID, restaurantID string, tableNumber int) {
+	c.Set(mw.ClaimsKey, &auth.SessionClaims{
+		TableID:      tableID,
+		RestaurantID: restaurantID,
+		TableNumber:  tableNumber,
+	})
+}
 
-	body, _ := json.Marshal(map[string]any{"table_id": "t1", "type": "CALL_WAITER"})
+func TestRequestHandler_Create_Success(t *testing.T) {
+	handler, _, _, _ := setupRequestRouter()
+
+	body, _ := json.Marshal(map[string]any{"type": "CALL_WAITER"})
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/requests", bytes.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
+	injectClaims(c, "t1", "r1", 1)
 
 	handler.Create(c)
 
@@ -63,14 +73,35 @@ func TestRequestHandler_Create_BadJSON(t *testing.T) {
 	}
 }
 
-func TestRequestHandler_Create_UseCaseError(t *testing.T) {
+func TestRequestHandler_Create_NoClaims(t *testing.T) {
 	handler, _, _, _ := setupRequestRouter()
 
-	body, _ := json.Marshal(map[string]any{"table_id": "nonexistent", "type": "CALL_WAITER"})
+	body, _ := json.Marshal(map[string]any{"type": "CALL_WAITER"})
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/requests", bytes.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
+	// No claims injected — simulates missing auth middleware
+
+	handler.Create(c)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestRequestHandler_Create_UseCaseError(t *testing.T) {
+	handler, requestRepo, _, _ := setupRequestRouter()
+	requestRepo.CreateFn = func(r *entity.Request) error {
+		return fmt.Errorf("db error")
+	}
+
+	body, _ := json.Marshal(map[string]any{"type": "CALL_WAITER"})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/requests", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	injectClaims(c, "t1", "r1", 1)
 
 	handler.Create(c)
 

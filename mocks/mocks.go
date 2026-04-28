@@ -57,6 +57,7 @@ type TableRepo struct {
 	FindByIDFn         func(id string) (*entity.Table, error)
 	FindByRestaurantFn func(restaurantID string) ([]entity.Table, error)
 	FindByQRCodeFn     func(qrCode string) (*entity.Table, error)
+	UpdateQRCodeFn     func(id, qrCode string) error
 }
 
 func NewTableRepo() *TableRepo {
@@ -107,15 +108,28 @@ func (m *TableRepo) FindByQRCode(qrCode string) (*entity.Table, error) {
 	return nil, fmt.Errorf("table not found")
 }
 
+func (m *TableRepo) UpdateQRCode(id, qrCode string) error {
+	if m.UpdateQRCodeFn != nil {
+		return m.UpdateQRCodeFn(id, qrCode)
+	}
+	t, ok := m.Tables[id]
+	if !ok {
+		return fmt.Errorf("table not found")
+	}
+	t.QRCode = qrCode
+	return nil
+}
+
 // --- RequestRepository Mock ---
 
 type RequestRepo struct {
-	Requests       map[string]*entity.Request
-	CreateFn       func(r *entity.Request) error
-	FindByIDFn     func(id string) (*entity.Request, error)
-	FindActiveFn   func(restaurantID string) ([]entity.Request, error)
-	FindByTableFn  func(tableID string) ([]entity.Request, error)
-	UpdateStatusFn func(id string, status entity.RequestStatus) error
+	Requests                 map[string]*entity.Request
+	CreateFn                 func(r *entity.Request) error
+	FindByIDFn               func(id string) (*entity.Request, error)
+	FindActiveFn             func(restaurantID string) ([]entity.Request, error)
+	FindByTableFn            func(tableID string) ([]entity.Request, error)
+	FindLastCreatedByTableFn func(tableID string) (*entity.Request, error)
+	UpdateStatusFn           func(id string, status entity.RequestStatus) error
 }
 
 func NewRequestRepo() *RequestRepo {
@@ -177,6 +191,24 @@ func (m *RequestRepo) UpdateStatus(id string, status entity.RequestStatus) error
 	}
 	r.Status = status
 	return nil
+}
+
+func (m *RequestRepo) FindLastCreatedByTableID(tableID string) (*entity.Request, error) {
+	if m.FindLastCreatedByTableFn != nil {
+		return m.FindLastCreatedByTableFn(tableID)
+	}
+	var latest *entity.Request
+	for _, r := range m.Requests {
+		if r.TableID == tableID {
+			if latest == nil || r.CreatedAt.After(latest.CreatedAt) {
+				latest = r
+			}
+		}
+	}
+	if latest == nil {
+		return nil, fmt.Errorf("request not found")
+	}
+	return latest, nil
 }
 
 // --- FeedbackRepository Mock ---

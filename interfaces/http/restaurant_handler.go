@@ -2,10 +2,12 @@ package http
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/waiter/back/application/usecase"
 	"github.com/waiter/back/interfaces/http/dto"
+	"go.uber.org/zap"
 )
 
 type RestaurantHandler struct {
@@ -119,4 +121,31 @@ func (h *RestaurantHandler) GetTables(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.ToTableListResponse(tables))
+}
+
+// RegenerateQR godoc
+// @Summary      Regenerar QR de mesa
+// @Description  Genera un nuevo código QR aleatorio para una mesa (admin)
+// @Tags         tables
+// @Produce      json
+// @Param        id  path      string  true  "ID de la mesa"
+// @Success      200  {object}  map[string]string
+// @Failure      404  {object}  dto.ErrorResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Router       /api/v1/admin/tables/{id}/regenerate-qr [post]
+func (h *RestaurantHandler) RegenerateQR(c *gin.Context) {
+	tableID := c.Param("id")
+
+	newCode, err := h.uc.RegenerateQR(tableID)
+	if err != nil {
+		if strings.Contains(err.Error(), "table not found") {
+			c.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "not_found", Message: "Mesa no encontrada."})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "internal_error", Message: "No se pudo regenerar el QR."})
+		return
+	}
+
+	zap.L().Info("qr regenerated", zap.String("table_id", tableID))
+	c.JSON(http.StatusOK, gin.H{"qr_code": newCode})
 }

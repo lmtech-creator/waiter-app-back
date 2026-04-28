@@ -40,3 +40,7 @@ func (r *TableRepo) FindByQRCode(qrCode string) (*entity.Table, error) {
 	}
 	return &table, nil
 }
+
+func (r *TableRepo) UpdateQRCode(id, qrCode string) error {
+	return r.db.Model(&entity.Table{}).Where("id = ?", id).Update("qr_code", qrCode).Error
+}

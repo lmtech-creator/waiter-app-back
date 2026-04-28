@@ -1,12 +1,26 @@
 package usecase
 
 import (
+	"crypto/rand"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/waiter/back/domain/entity"
 	"github.com/waiter/back/domain/repository"
 )
+
+const qrAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+func generateQRCode(length int) (string, error) {
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	for i := range b {
+		b[i] = qrAlphabet[int(b[i])%len(qrAlphabet)]
+	}
+	return string(b), nil
+}
 
 type RestaurantUseCase struct {
 	restaurantRepo repository.RestaurantRepository
@@ -55,11 +69,17 @@ func (uc *RestaurantUseCase) CreateTable(input CreateTableInput) (*entity.Table,
 		return nil, fmt.Errorf("restaurant not found: %w", err)
 	}
 
+	qr, err := generateQRCode(10)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate QR code: %w", err)
+	}
+
 	t := &entity.Table{
 		ID:           uuid.New().String(),
 		Number:       input.Number,
 		RestaurantID: input.RestaurantID,
-		QRCode:       fmt.Sprintf("table-%s-%d", input.RestaurantID, input.Number),
+		QRCode:       qr,
+		IsActive:     true,
 	}
 
 	if err := uc.tableRepo.Create(t); err != nil {
@@ -71,4 +91,21 @@ func (uc *RestaurantUseCase) CreateTable(input CreateTableInput) (*entity.Table,
 
 func (uc *RestaurantUseCase) GetTables(restaurantID string) ([]entity.Table, error) {
 	return uc.tableRepo.FindByRestaurantID(restaurantID)
+}
+
+func (uc *RestaurantUseCase) RegenerateQR(tableID string) (string, error) {
+	if _, err := uc.tableRepo.FindByID(tableID); err != nil {
+		return "", fmt.Errorf("table not found: %w", err)
+	}
+
+	newCode, err := generateQRCode(10)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate QR code: %w", err)
+	}
+
+	if err := uc.tableRepo.UpdateQRCode(tableID, newCode); err != nil {
+		return "", fmt.Errorf("failed to update QR code: %w", err)
+	}
+
+	return newCode, nil
 }

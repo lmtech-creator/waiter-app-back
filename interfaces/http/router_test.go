@@ -12,7 +12,8 @@ import (
 	"github.com/waiter/back/mocks"
 )
 
-func TestSetupRouter_HealthCheck(t *testing.T) {
+func buildTestRouter(t *testing.T) *gin.Engine {
+	t.Helper()
 	gin.SetMode(gin.TestMode)
 
 	requestRepo := mocks.NewRequestRepo()
@@ -28,9 +29,14 @@ func TestSetupRouter_HealthCheck(t *testing.T) {
 	requestHandler := NewRequestHandler(requestUC)
 	feedbackHandler := NewFeedbackHandler(feedbackUC)
 	restaurantHandler := NewRestaurantHandler(restaurantUC)
+	sessionHandler := NewSessionHandler(tableRepo, []byte("test-secret-that-is-long-enough!!"))
 	hub := ws.NewHub()
 
-	router := SetupRouter(requestHandler, feedbackHandler, restaurantHandler, hub)
+	return SetupRouter(requestHandler, feedbackHandler, restaurantHandler, sessionHandler, hub, []byte("test-secret-that-is-long-enough!!"))
+}
+
+func TestSetupRouter_HealthCheck(t *testing.T) {
+	router := buildTestRouter(t)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
@@ -42,27 +48,11 @@ func TestSetupRouter_HealthCheck(t *testing.T) {
 }
 
 func TestSetupRouter_RoutesExist(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	requestRepo := mocks.NewRequestRepo()
-	tableRepo := mocks.NewTableRepo()
-	notifier := mocks.NewNotifier()
-	feedbackRepo := mocks.NewFeedbackRepo()
-	restaurantRepo := mocks.NewRestaurantRepo()
-
-	requestUC := usecase.NewRequestUseCase(requestRepo, tableRepo, notifier)
-	feedbackUC := usecase.NewFeedbackUseCase(feedbackRepo, tableRepo)
-	restaurantUC := usecase.NewRestaurantUseCase(restaurantRepo, tableRepo)
-
-	requestHandler := NewRequestHandler(requestUC)
-	feedbackHandler := NewFeedbackHandler(feedbackUC)
-	restaurantHandler := NewRestaurantHandler(restaurantUC)
-	hub := ws.NewHub()
-
-	router := SetupRouter(requestHandler, feedbackHandler, restaurantHandler, hub)
+	router := buildTestRouter(t)
 
 	routes := router.Routes()
 	expectedPaths := map[string]string{
+		"POST:/api/v1/session":                                  "",
 		"POST:/api/v1/requests":                                 "",
 		"GET:/api/v1/tables/:tableId/status":                    "",
 		"POST:/api/v1/feedback":                                 "",
@@ -72,6 +62,7 @@ func TestSetupRouter_RoutesExist(t *testing.T) {
 		"GET:/api/v1/restaurants/:restaurantId":                 "",
 		"POST:/api/v1/restaurants/:restaurantId/tables":         "",
 		"GET:/api/v1/restaurants/:restaurantId/tables":          "",
+		"POST:/api/v1/admin/tables/:id/regenerate-qr":           "",
 		"GET:/api/v1/ws/:restaurantId":                          "",
 		"GET:/health":                                           "",
 	}
@@ -87,24 +78,7 @@ func TestSetupRouter_RoutesExist(t *testing.T) {
 }
 
 func TestSetupRouter_IntegrationCreateRestaurant(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	requestRepo := mocks.NewRequestRepo()
-	tableRepo := mocks.NewTableRepo()
-	notifier := mocks.NewNotifier()
-	feedbackRepo := mocks.NewFeedbackRepo()
-	restaurantRepo := mocks.NewRestaurantRepo()
-
-	requestUC := usecase.NewRequestUseCase(requestRepo, tableRepo, notifier)
-	feedbackUC := usecase.NewFeedbackUseCase(feedbackRepo, tableRepo)
-	restaurantUC := usecase.NewRestaurantUseCase(restaurantRepo, tableRepo)
-
-	requestHandler := NewRequestHandler(requestUC)
-	feedbackHandler := NewFeedbackHandler(feedbackUC)
-	restaurantHandler := NewRestaurantHandler(restaurantUC)
-	hub := ws.NewHub()
-
-	router := SetupRouter(requestHandler, feedbackHandler, restaurantHandler, hub)
+	router := buildTestRouter(t)
 
 	w := httptest.NewRecorder()
 	body := `{"name":"Integration Test Restaurant"}`

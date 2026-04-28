@@ -98,9 +98,11 @@ func TestCreateTable_Success(t *testing.T) {
 	if tbl.RestaurantID != "r1" {
 		t.Errorf("expected restaurant_id r1, got %s", tbl.RestaurantID)
 	}
-	expected := fmt.Sprintf("table-r1-%d", 5)
-	if tbl.QRCode != expected {
-		t.Errorf("expected QRCode '%s', got '%s'", expected, tbl.QRCode)
+	if tbl.QRCode == "" {
+		t.Error("expected non-empty QR code")
+	}
+	if len(tbl.QRCode) != 10 {
+		t.Errorf("expected QR code of length 10, got %d", len(tbl.QRCode))
 	}
 	if tbl.ID == "" {
 		t.Error("expected non-empty ID")

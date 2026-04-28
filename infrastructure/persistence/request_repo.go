@@ -48,3 +48,14 @@ func (r *RequestRepo) FindByTableID(tableID string) ([]entity.Request, error) {
 func (r *RequestRepo) UpdateStatus(id string, status entity.RequestStatus) error {
 	return r.db.Model(&entity.Request{}).Where("id = ?", id).Update("status", status).Error
 }
+
+func (r *RequestRepo) FindLastCreatedByTableID(tableID string) (*entity.Request, error) {
+	var request entity.Request
+	err := r.db.Where("table_id = ?", tableID).
+		Order("created_at DESC").
+		First(&request).Error
+	if err != nil {
+		return nil, err
+	}
+	return &request, nil
+}

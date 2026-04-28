@@ -13,6 +13,7 @@ type Table struct {
 	Number       int    `json:"number" gorm:"not null"`
 	RestaurantID string `json:"restaurant_id" gorm:"type:uuid;not null;index"`
 	QRCode       string `json:"qr_code" gorm:"not null;uniqueIndex"`
+	IsActive     bool   `json:"is_active" gorm:"not null;default:true"`
 }
 
 type RequestType string

@@ -13,6 +13,7 @@ type TableRepository interface {
 	FindByID(id string) (*entity.Table, error)
 	FindByRestaurantID(restaurantID string) ([]entity.Table, error)
 	FindByQRCode(qrCode string) (*entity.Table, error)
+	UpdateQRCode(id, qrCode string) error
 }
 
 type RequestRepository interface {
@@ -20,6 +21,7 @@ type RequestRepository interface {
 	FindByID(id string) (*entity.Request, error)
 	FindActiveByRestaurantID(restaurantID string) ([]entity.Request, error)
 	FindByTableID(tableID string) ([]entity.Request, error)
+	FindLastCreatedByTableID(tableID string) (*entity.Request, error)
 	UpdateStatus(id string, status entity.RequestStatus) error
 }
 

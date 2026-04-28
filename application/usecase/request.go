@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/waiter/back/domain/entity"
@@ -23,9 +24,22 @@ func NewRequestUseCase(rr repository.RequestRepository, tr repository.TableRepos
 	return &RequestUseCase{requestRepo: rr, tableRepo: tr, notifier: n}
 }
 
+// CooldownSeconds is the minimum wait between requests from the same table.
+const CooldownSeconds = 15
+
+// CooldownError is returned when a request is rejected due to the per-table cooldown.
+type CooldownError struct {
+	SecondsRemaining int
+}
+
+func (e *CooldownError) Error() string {
+	return fmt.Sprintf("cooldown: wait %d seconds", e.SecondsRemaining)
+}
+
 type CreateRequestInput struct {
-	TableID string             `json:"table_id" binding:"required"`
-	Type    entity.RequestType `json:"type" binding:"required"`
+	TableID      string             `json:"table_id"`
+	RestaurantID string             `json:"restaurant_id,omitempty"`
+	Type         entity.RequestType `json:"type" binding:"required"`
 }
 
 func (uc *RequestUseCase) CreateRequest(input CreateRequestInput) (*entity.Request, error) {
@@ -33,10 +47,26 @@ func (uc *RequestUseCase) CreateRequest(input CreateRequestInput) (*entity.Reque
 		return nil, fmt.Errorf("invalid request type: %s", input.Type)
 	}
 
-	table, err := uc.tableRepo.FindByID(input.TableID)
-	if err != nil {
-		return nil, fmt.Errorf("table not found: %w", err)
+	// Resolve RestaurantID: prefer from input (JWT claims), fall back to table lookup.
+	restaurantID := input.RestaurantID
+	if restaurantID == "" {
+		table, err := uc.tableRepo.FindByID(input.TableID)
+		if err != nil {
+			return nil, fmt.Errorf("table not found: %w", err)
+		}
+		restaurantID = table.RestaurantID
 	}
+
+	// Per-table cooldown check (§5): query DB for the last request timestamp.
+	last, err := uc.requestRepo.FindLastCreatedByTableID(input.TableID)
+	if err == nil {
+		elapsed := time.Since(last.CreatedAt)
+		if elapsed < CooldownSeconds*time.Second {
+			remaining := CooldownSeconds - int(elapsed.Seconds())
+			return nil, &CooldownError{SecondsRemaining: remaining}
+		}
+	}
+	// err != nil means no previous request — cooldown not applicable.
 
 	req := &entity.Request{
 		ID:      uuid.New().String(),
@@ -49,7 +79,7 @@ func (uc *RequestUseCase) CreateRequest(input CreateRequestInput) (*entity.Reque
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	uc.notifier.Notify(table.RestaurantID, map[string]any{
+	uc.notifier.Notify(restaurantID, map[string]any{
 		"event":   "new_request",
 		"request": req,
 	})

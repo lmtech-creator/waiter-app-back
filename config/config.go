@@ -6,8 +6,9 @@ import (
 )
 
 type Config struct {
-	Port string
-	DSN  string
+	Port          string
+	DSN           string
+	SessionSecret string // hex-encoded; validated/decoded in main
 }
 
 func Load() *Config {
@@ -29,8 +30,9 @@ func Load() *Config {
 	}
 
 	return &Config{
-		Port: port,
-		DSN:  dsn,
+		Port:          port,
+		DSN:           dsn,
+		SessionSecret: os.Getenv("SESSION_SECRET"),
 	}
 }
 
