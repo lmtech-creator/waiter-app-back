@@ -12,7 +12,7 @@ import (
 )
 
 func TestNewHub(t *testing.T) {
-	hub := NewHub()
+	hub := NewHub(nil)
 	if hub == nil {
 		t.Fatal("expected non-nil hub")
 	}
@@ -22,19 +22,19 @@ func TestNewHub(t *testing.T) {
 }
 
 func TestHub_Notify_NoClients(t *testing.T) {
-	hub := NewHub()
+	hub := NewHub(nil)
 	// Should not panic with no clients
 	hub.Notify("r1", map[string]string{"event": "test"})
 }
 
 func TestHub_Notify_InvalidJSON(t *testing.T) {
-	hub := NewHub()
+	hub := NewHub(nil)
 	// Should not panic with unmarshalable data
 	hub.Notify("r1", make(chan int))
 }
 
 func TestHub_SubscribeAndNotify(t *testing.T) {
-	hub := NewHub()
+	hub := NewHub(nil)
 
 	// Create test server with the hub
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +73,7 @@ func TestHub_SubscribeAndNotify(t *testing.T) {
 }
 
 func TestHub_MultipleClients(t *testing.T) {
-	hub := NewHub()
+	hub := NewHub(nil)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hub.Subscribe(w, r, "rest1")
@@ -116,7 +116,7 @@ func TestHub_MultipleClients(t *testing.T) {
 }
 
 func TestHub_ClientDisconnect(t *testing.T) {
-	hub := NewHub()
+	hub := NewHub(nil)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hub.Subscribe(w, r, "rest1")
@@ -147,7 +147,7 @@ func TestHub_ClientDisconnect(t *testing.T) {
 }
 
 func TestHub_DifferentRooms(t *testing.T) {
-	hub := NewHub()
+	hub := NewHub(nil)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		room := r.URL.Query().Get("room")
@@ -192,5 +192,41 @@ func TestHub_DifferentRooms(t *testing.T) {
 	_, _, err = conn2.ReadMessage()
 	if err == nil {
 		t.Error("client 2 should not have received a message for room r1")
+	}
+}
+
+func TestHub_CheckOrigin_AllowedOrigin(t *testing.T) {
+	hub := NewHub([]string{"http://allowed.example.com"})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hub.Subscribe(w, r, "r1")
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	hdr := http.Header{"Origin": {"http://allowed.example.com"}}
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, hdr)
+	if err != nil {
+		t.Fatalf("expected connection with allowed origin to succeed: %v", err)
+	}
+	conn.Close()
+}
+
+func TestHub_CheckOrigin_RejectedOrigin(t *testing.T) {
+	hub := NewHub([]string{"http://allowed.example.com"})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hub.Subscribe(w, r, "r1")
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	hdr := http.Header{"Origin": {"http://evil.example.com"}}
+	_, resp, err := websocket.DefaultDialer.Dial(wsURL, hdr)
+	if err == nil {
+		t.Fatal("expected connection with disallowed origin to be rejected")
+	}
+	if resp == nil || resp.StatusCode != http.StatusForbidden {
+		t.Errorf("expected 403, got status %v", resp)
 	}
 }

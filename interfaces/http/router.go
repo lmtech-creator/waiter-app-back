@@ -64,7 +64,7 @@ func SetupRouter(
 	}
 
 	// WebSocket
-	wsHandler := NewWSHandler(hub)
+	wsHandler := NewWSHandler(hub, secret)
 	api.GET("/ws/:restaurantId", wsHandler.Connect)
 
 	return r

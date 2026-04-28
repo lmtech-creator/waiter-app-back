@@ -30,7 +30,7 @@ func buildTestRouter(t *testing.T) *gin.Engine {
 	feedbackHandler := NewFeedbackHandler(feedbackUC)
 	restaurantHandler := NewRestaurantHandler(restaurantUC)
 	sessionHandler := NewSessionHandler(tableRepo, []byte("test-secret-that-is-long-enough!!"))
-	hub := ws.NewHub()
+	hub := ws.NewHub(nil)
 
 	return SetupRouter(requestHandler, feedbackHandler, restaurantHandler, sessionHandler, hub, []byte("test-secret-that-is-long-enough!!"))
 }

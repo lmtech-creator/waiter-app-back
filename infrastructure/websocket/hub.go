@@ -9,27 +9,37 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		// In production, validate the origin against an allowlist.
-		return true
-	},
-}
-
 type Hub struct {
-	mu    sync.RWMutex
-	rooms map[string]map[*websocket.Conn]bool
+	mu       sync.RWMutex
+	rooms    map[string]map[*websocket.Conn]bool
+	upgrader websocket.Upgrader
 }
 
-func NewHub() *Hub {
+// NewHub creates a new Hub.
+// allowedOrigins is an allowlist of Origin header values; if empty, all origins are accepted (dev mode).
+func NewHub(allowedOrigins []string) *Hub {
+	allowed := make(map[string]bool, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		if o != "" {
+			allowed[o] = true
+		}
+	}
 	return &Hub{
 		rooms: make(map[string]map[*websocket.Conn]bool),
+		upgrader: websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				if len(allowed) == 0 {
+					return true // dev: accept all origins
+				}
+				return allowed[r.Header.Get("Origin")]
+			},
+		},
 	}
 }
 
 // Subscribe upgrades an HTTP connection to WebSocket and registers it to a restaurant room.
 func (h *Hub) Subscribe(w http.ResponseWriter, r *http.Request, restaurantID string) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		slog.Error("websocket upgrade failed", "error", err)
 		return

@@ -4,6 +4,7 @@ import (
 	cryptorand "crypto/rand"
 	"encoding/hex"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/waiter/back/application/usecase"
@@ -47,7 +48,7 @@ func main() {
 	feedbackRepo := persistence.NewFeedbackRepo(db)
 
 	// WebSocket hub
-	hub := ws.NewHub()
+	hub := ws.NewHub(parseOrigins(cfg.AllowedOrigins))
 
 	// Use cases
 	requestUC := usecase.NewRequestUseCase(requestRepo, tableRepo, hub)
@@ -70,6 +71,17 @@ func main() {
 	if err := router.Run(":" + cfg.Port); err != nil {
 		zap.L().Fatal("server failed", zap.Error(err))
 	}
+}
+
+// parseOrigins splits a comma-separated origin string into a slice, trimming whitespace.
+func parseOrigins(s string) []string {
+	var out []string
+	for _, o := range strings.Split(s, ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			out = append(out, o)
+		}
+	}
+	return out
 }
 
 // resolveSecret decodes SESSION_SECRET from hex, or generates a random one for development.
