@@ -14,8 +14,10 @@ func SetupRouter(
 	feedbackHandler *FeedbackHandler,
 	restaurantHandler *RestaurantHandler,
 	sessionHandler *SessionHandler,
+	adminHandler *AdminHandler,
 	hub *ws.Hub,
 	secret []byte,
+	adminSecret []byte,
 ) *gin.Engine {
 	r := gin.Default()
 
@@ -49,22 +51,28 @@ func SetupRouter(
 		customer.POST("/requests", requestHandler.Create)
 	}
 
-	// Restaurant admin endpoints (TODO: add AdminAuthMiddleware when implemented)
-	admin := api.Group("")
+	// Public admin auth
+	api.POST("/admin/login", adminHandler.Login)
+
+	// Public: customer-facing read routes
+	api.GET("/tables/:tableId/status", requestHandler.GetTableStatus)
+	api.POST("/feedback", feedbackHandler.Create)
+
+	// Admin protected routes
+	adminGroup := api.Group("")
+	adminGroup.Use(mw.AdminAuthMiddleware(adminSecret))
 	{
-		admin.GET("/tables/:tableId/status", requestHandler.GetTableStatus)
-		admin.POST("/feedback", feedbackHandler.Create)
-		admin.GET("/restaurants/:restaurantId/requests/active", requestHandler.GetActive)
-		admin.PATCH("/requests/:requestId", requestHandler.Complete)
-		admin.POST("/restaurants", restaurantHandler.Create)
-		admin.GET("/restaurants/:restaurantId", restaurantHandler.Get)
-		admin.POST("/restaurants/:restaurantId/tables", restaurantHandler.CreateTable)
-		admin.GET("/restaurants/:restaurantId/tables", restaurantHandler.GetTables)
-		admin.POST("/admin/tables/:id/regenerate-qr", restaurantHandler.RegenerateQR)
+		adminGroup.GET("/restaurants/:restaurantId/requests/active", requestHandler.GetActive)
+		adminGroup.PATCH("/requests/:requestId", requestHandler.Complete)
+		adminGroup.POST("/restaurants", restaurantHandler.Create)
+		adminGroup.GET("/restaurants/:restaurantId", restaurantHandler.Get)
+		adminGroup.POST("/restaurants/:restaurantId/tables", restaurantHandler.CreateTable)
+		adminGroup.GET("/restaurants/:restaurantId/tables", restaurantHandler.GetTables)
+		adminGroup.POST("/admin/tables/:id/regenerate-qr", restaurantHandler.RegenerateQR)
 	}
 
 	// WebSocket
-	wsHandler := NewWSHandler(hub, secret)
+	wsHandler := NewWSHandler(hub, secret, adminSecret)
 	api.GET("/ws/:restaurantId", wsHandler.Connect)
 
 	return r

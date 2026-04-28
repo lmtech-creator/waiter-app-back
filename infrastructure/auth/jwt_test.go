@@ -104,3 +104,93 @@ func TestVerifySession_NoExpiry(t *testing.T) {
 		t.Fatal("expected error for token without expiry")
 	}
 }
+
+// ─── Admin JWT tests ───────────────────────────────────────────────────────
+
+var adminTestSecret = []byte("admin-test-secret-32bytes-enough")
+
+func makeAdminClaims(expOffset time.Duration) AdminClaims {
+	return AdminClaims{
+		AdminID:      "admin-1",
+		RestaurantID: "r1",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expOffset)),
+		},
+	}
+}
+
+func TestSignAdminSession_Success(t *testing.T) {
+	claims := makeAdminClaims(24 * time.Hour)
+	token, err := SignAdminSession(claims, adminTestSecret)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if token == "" {
+		t.Error("expected non-empty token")
+	}
+}
+
+func TestVerifyAdminSession_Valid(t *testing.T) {
+	claims := makeAdminClaims(24 * time.Hour)
+	token, _ := SignAdminSession(claims, adminTestSecret)
+
+	got, err := VerifyAdminSession(token, adminTestSecret)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.AdminID != "admin-1" {
+		t.Errorf("expected AdminID admin-1, got %s", got.AdminID)
+	}
+	if got.RestaurantID != "r1" {
+		t.Errorf("expected RestaurantID r1, got %s", got.RestaurantID)
+	}
+}
+
+func TestVerifyAdminSession_Expired(t *testing.T) {
+	claims := makeAdminClaims(-1 * time.Minute)
+	token, _ := SignAdminSession(claims, adminTestSecret)
+
+	_, err := VerifyAdminSession(token, adminTestSecret)
+	if err == nil {
+		t.Fatal("expected error for expired admin token")
+	}
+}
+
+func TestVerifyAdminSession_WrongSecret(t *testing.T) {
+	claims := makeAdminClaims(24 * time.Hour)
+	token, _ := SignAdminSession(claims, adminTestSecret)
+
+	_, err := VerifyAdminSession(token, []byte("wrong-secret-32bytes-also-enough!"))
+	if err == nil {
+		t.Fatal("expected error for wrong secret")
+	}
+}
+
+func TestVerifyAdminSession_InvalidToken(t *testing.T) {
+	_, err := VerifyAdminSession("not.a.valid.jwt", adminTestSecret)
+	if err == nil {
+		t.Fatal("expected error for invalid token string")
+	}
+}
+
+func TestVerifyAdminSession_WrongAlgorithm(t *testing.T) {
+	claims := makeAdminClaims(24 * time.Hour)
+	tk := jwt.NewWithClaims(jwt.SigningMethodHS384, claims)
+	signed, _ := tk.SignedString(adminTestSecret)
+
+	_, err := VerifyAdminSession(signed, adminTestSecret)
+	if err == nil {
+		t.Fatal("expected error for disallowed algorithm")
+	}
+}
+
+func TestVerifyAdminSession_SessionTokenRejected(t *testing.T) {
+	// A customer session JWT must not pass admin verification.
+	sessionClaims := makeClaims(30 * time.Minute)
+	token, _ := SignSession(sessionClaims, adminTestSecret)
+
+	_, err := VerifyAdminSession(token, adminTestSecret)
+	if err == nil {
+		t.Fatal("expected customer session token to fail admin verification")
+	}
+}

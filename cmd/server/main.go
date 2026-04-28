@@ -34,7 +34,8 @@ func main() {
 
 	cfg := config.Load()
 
-	secret := resolveSecret(cfg.SessionSecret)
+	secret := resolveSecret("SESSION_SECRET", cfg.SessionSecret)
+	adminSecret := resolveSecret("ADMIN_SECRET", cfg.AdminSecret)
 
 	db, err := persistence.NewDatabase(cfg.DSN)
 	if err != nil {
@@ -46,6 +47,7 @@ func main() {
 	tableRepo := persistence.NewTableRepo(db)
 	requestRepo := persistence.NewRequestRepo(db)
 	feedbackRepo := persistence.NewFeedbackRepo(db)
+	adminRepo := persistence.NewAdminRepo(db)
 
 	// WebSocket hub
 	hub := ws.NewHub(parseOrigins(cfg.AllowedOrigins))
@@ -54,18 +56,30 @@ func main() {
 	requestUC := usecase.NewRequestUseCase(requestRepo, tableRepo, hub)
 	feedbackUC := usecase.NewFeedbackUseCase(feedbackRepo, tableRepo)
 	restaurantUC := usecase.NewRestaurantUseCase(restaurantRepo, tableRepo)
+	adminUC := usecase.NewAdminUseCase(adminRepo, adminSecret)
+
+	// Seed admin user on first run
+	if seeded, username, password, err := usecase.SeedAdminIfNeeded(adminRepo); err != nil {
+		zap.L().Error("failed to seed admin user", zap.Error(err))
+	} else if seeded {
+		zap.L().Info("admin user created — change this password immediately",
+			zap.String("username", username),
+			zap.String("password", password),
+		)
+	}
 
 	// Handlers
 	requestHandler := handler.NewRequestHandler(requestUC)
 	feedbackHandler := handler.NewFeedbackHandler(feedbackUC)
 	restaurantHandler := handler.NewRestaurantHandler(restaurantUC)
 	sessionHandler := handler.NewSessionHandler(tableRepo, secret)
+	adminHandler := handler.NewAdminHandler(adminUC)
 
 	// Background tasks
 	go mw.StartLimiterCleanup()
 
 	// Router
-	router := handler.SetupRouter(requestHandler, feedbackHandler, restaurantHandler, sessionHandler, hub, secret)
+	router := handler.SetupRouter(requestHandler, feedbackHandler, restaurantHandler, sessionHandler, adminHandler, hub, secret, adminSecret)
 
 	zap.L().Info("server starting", zap.String("port", cfg.Port))
 	if err := router.Run(":" + cfg.Port); err != nil {
@@ -84,16 +98,16 @@ func parseOrigins(s string) []string {
 	return out
 }
 
-// resolveSecret decodes SESSION_SECRET from hex, or generates a random one for development.
-func resolveSecret(hexStr string) []byte {
+// resolveSecret decodes a hex secret from env, or generates a random one for development.
+func resolveSecret(envKey, hexStr string) []byte {
 	if hexStr != "" {
 		b, err := hex.DecodeString(hexStr)
 		if err == nil && len(b) >= 32 {
 			return b
 		}
-		zap.L().Warn("SESSION_SECRET is invalid or too short; using random secret (not for production)")
+		zap.L().Warn(envKey + " is invalid or too short; using random secret (not for production)")
 	} else {
-		zap.L().Warn("SESSION_SECRET not set; using random secret (not for production)")
+		zap.L().Warn(envKey + " not set; using random secret (not for production)")
 	}
 	b := make([]byte, 32)
 	if _, err := cryptorand.Read(b); err != nil {

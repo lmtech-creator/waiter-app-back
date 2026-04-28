@@ -15,6 +15,102 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/v1/admin/login": {
+            "post": {
+                "description": "Valida credenciales y retorna un JWT de administrador con duración de 24 horas",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Login de administrador",
+                "parameters": [
+                    {
+                        "description": "Credenciales de administrador",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminLoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminLoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/tables/{id}/regenerate-qr": {
+            "post": {
+                "description": "Genera un nuevo código QR aleatorio para una mesa (admin)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tables"
+                ],
+                "summary": "Regenerar QR de mesa",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la mesa",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/feedback": {
             "post": {
                 "description": "Registra el feedback de un cliente sobre el servicio",
@@ -35,7 +131,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/usecase.CreateFeedbackInput"
+                            "$ref": "#/definitions/dto.CreateFeedbackRequest"
                         }
                     }
                 ],
@@ -43,25 +139,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Feedback"
+                            "$ref": "#/definitions/dto.FeedbackResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -69,7 +159,7 @@ const docTemplate = `{
         },
         "/api/v1/requests": {
             "post": {
-                "description": "Crea una nueva solicitud de mesa (llamar mozo, pedir cuenta, ayuda)",
+                "description": "Crea una nueva solicitud de mesa (llamar mozo, pedir cuenta, ayuda). Requiere JWT de sesión.",
                 "consumes": [
                     "application/json"
                 ],
@@ -82,12 +172,19 @@ const docTemplate = `{
                 "summary": "Crear solicitud",
                 "parameters": [
                     {
-                        "description": "Datos de la solicitud",
+                        "type": "string",
+                        "description": "Bearer \u003csession_token\u003e",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Tipo de solicitud",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/usecase.CreateRequestInput"
+                            "$ref": "#/definitions/dto.CreateRequestRequest"
                         }
                     }
                 ],
@@ -95,11 +192,17 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Request"
+                            "$ref": "#/definitions/dto.RequestResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -110,10 +213,13 @@ const docTemplate = `{
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -146,7 +252,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.updateRequestInput"
+                            "$ref": "#/definitions/dto.UpdateRequestStatusRequest"
                         }
                     }
                 ],
@@ -157,19 +263,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -195,7 +295,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/usecase.CreateRestaurantInput"
+                            "$ref": "#/definitions/dto.CreateRestaurantRequest"
                         }
                     }
                 ],
@@ -203,25 +303,19 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Restaurant"
+                            "$ref": "#/definitions/dto.RestaurantResponse"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -250,16 +344,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.Restaurant"
+                            "$ref": "#/definitions/dto.RestaurantResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -290,17 +381,14 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/entity.Request"
+                                "$ref": "#/definitions/dto.RequestResponse"
                             }
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -331,17 +419,14 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/entity.Table"
+                                "$ref": "#/definitions/dto.TableResponse"
                             }
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -372,7 +457,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http.createTableInput"
+                            "$ref": "#/definitions/dto.CreateTableRequest"
                         }
                     }
                 ],
@@ -380,7 +465,59 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Table"
+                            "$ref": "#/definitions/dto.TableResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/session": {
+            "post": {
+                "description": "Valida el código QR de una mesa y devuelve un JWT de sesión (30 min)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "session"
+                ],
+                "summary": "Iniciar sesión con QR",
+                "parameters": [
+                    {
+                        "description": "Código QR de la mesa",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.SessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.SessionResponse"
                         }
                     },
                     "400": {
@@ -392,8 +529,17 @@ const docTemplate = `{
                             }
                         }
                     },
-                    "422": {
-                        "description": "Unprocessable Entity",
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -429,12 +575,57 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/entity.Request"
+                                "$ref": "#/definitions/dto.RequestResponse"
                             }
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ws/{restaurantId}": {
+            "get": {
+                "description": "Acepta JWT de admin (admin_secret) o de sesión de cliente. Requiere ?token=\u003cjwt\u003e",
+                "tags": [
+                    "websocket"
+                ],
+                "summary": "Conectar al WebSocket del restaurante",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del restaurante",
+                        "name": "restaurantId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "JWT de admin o de sesión de cliente",
+                        "name": "token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "101": {
+                        "description": "Switching Protocols"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -447,7 +638,93 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "entity.Feedback": {
+        "dto.AdminLoginRequest": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.AdminLoginResponse": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.CreateFeedbackRequest": {
+            "type": "object",
+            "required": [
+                "score",
+                "table_id"
+            ],
+            "properties": {
+                "comment": {
+                    "type": "string"
+                },
+                "score": {
+                    "type": "integer",
+                    "maximum": 5,
+                    "minimum": 1
+                },
+                "table_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.CreateRequestRequest": {
+            "type": "object",
+            "required": [
+                "type"
+            ],
+            "properties": {
+                "type": {
+                    "$ref": "#/definitions/entity.RequestType"
+                }
+            }
+        },
+        "dto.CreateRestaurantRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "plan": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.CreateTableRequest": {
+            "type": "object",
+            "required": [
+                "number"
+            ],
+            "properties": {
+                "number": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.FeedbackResponse": {
             "type": "object",
             "properties": {
                 "comment": {
@@ -467,7 +744,7 @@ const docTemplate = `{
                 }
             }
         },
-        "entity.Request": {
+        "dto.RequestResponse": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -484,6 +761,75 @@ const docTemplate = `{
                 },
                 "type": {
                     "$ref": "#/definitions/entity.RequestType"
+                }
+            }
+        },
+        "dto.RestaurantResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "plan": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.SessionRequest": {
+            "type": "object",
+            "properties": {
+                "qr_code": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.SessionResponse": {
+            "type": "object",
+            "properties": {
+                "session_token": {
+                    "type": "string"
+                },
+                "table": {
+                    "$ref": "#/definitions/dto.TablePublic"
+                }
+            }
+        },
+        "dto.TablePublic": {
+            "type": "object",
+            "properties": {
+                "number": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.TableResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "number": {
+                    "type": "integer"
+                },
+                "qr_code": {
+                    "type": "string"
+                },
+                "restaurant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.UpdateRequestStatusRequest": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "status": {
+                    "$ref": "#/definitions/entity.RequestStatus"
                 }
             }
         },
@@ -512,108 +858,6 @@ const docTemplate = `{
                 "AskBill",
                 "AskHelp"
             ]
-        },
-        "entity.Restaurant": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "plan": {
-                    "type": "string"
-                }
-            }
-        },
-        "entity.Table": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "number": {
-                    "type": "integer"
-                },
-                "qr_code": {
-                    "type": "string"
-                },
-                "restaurant_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "http.createTableInput": {
-            "type": "object",
-            "required": [
-                "number"
-            ],
-            "properties": {
-                "number": {
-                    "type": "integer"
-                }
-            }
-        },
-        "http.updateRequestInput": {
-            "type": "object",
-            "required": [
-                "status"
-            ],
-            "properties": {
-                "status": {
-                    "$ref": "#/definitions/entity.RequestStatus"
-                }
-            }
-        },
-        "usecase.CreateFeedbackInput": {
-            "type": "object",
-            "required": [
-                "score",
-                "table_id"
-            ],
-            "properties": {
-                "comment": {
-                    "type": "string"
-                },
-                "score": {
-                    "type": "integer",
-                    "maximum": 5,
-                    "minimum": 1
-                },
-                "table_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "usecase.CreateRequestInput": {
-            "type": "object",
-            "required": [
-                "table_id",
-                "type"
-            ],
-            "properties": {
-                "table_id": {
-                    "type": "string"
-                },
-                "type": {
-                    "$ref": "#/definitions/entity.RequestType"
-                }
-            }
-        },
-        "usecase.CreateRestaurantInput": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "name": {
-                    "type": "string"
-                },
-                "plan": {
-                    "type": "string"
-                }
-            }
         }
     }
 }`

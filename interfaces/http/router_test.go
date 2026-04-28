@@ -5,12 +5,33 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/waiter/back/application/usecase"
+	"github.com/waiter/back/infrastructure/auth"
 	ws "github.com/waiter/back/infrastructure/websocket"
 	"github.com/waiter/back/mocks"
 )
+
+var routerAdminSecret = []byte("admin-test-secret-32bytes-enough")
+
+func makeRouterAdminToken(t *testing.T) string {
+	t.Helper()
+	claims := auth.AdminClaims{
+		AdminID:      "admin-1",
+		RestaurantID: "r1",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+		},
+	}
+	token, err := auth.SignAdminSession(claims, routerAdminSecret)
+	if err != nil {
+		t.Fatalf("could not sign admin token: %v", err)
+	}
+	return token
+}
 
 func buildTestRouter(t *testing.T) *gin.Engine {
 	t.Helper()
@@ -21,18 +42,21 @@ func buildTestRouter(t *testing.T) *gin.Engine {
 	notifier := mocks.NewNotifier()
 	feedbackRepo := mocks.NewFeedbackRepo()
 	restaurantRepo := mocks.NewRestaurantRepo()
+	adminRepo := mocks.NewAdminRepo()
 
 	requestUC := usecase.NewRequestUseCase(requestRepo, tableRepo, notifier)
 	feedbackUC := usecase.NewFeedbackUseCase(feedbackRepo, tableRepo)
 	restaurantUC := usecase.NewRestaurantUseCase(restaurantRepo, tableRepo)
+	adminUC := usecase.NewAdminUseCase(adminRepo, []byte("admin-test-secret-32bytes-enough"))
 
 	requestHandler := NewRequestHandler(requestUC)
 	feedbackHandler := NewFeedbackHandler(feedbackUC)
 	restaurantHandler := NewRestaurantHandler(restaurantUC)
 	sessionHandler := NewSessionHandler(tableRepo, []byte("test-secret-that-is-long-enough!!"))
+	adminHandler := NewAdminHandler(adminUC)
 	hub := ws.NewHub(nil)
 
-	return SetupRouter(requestHandler, feedbackHandler, restaurantHandler, sessionHandler, hub, []byte("test-secret-that-is-long-enough!!"))
+	return SetupRouter(requestHandler, feedbackHandler, restaurantHandler, sessionHandler, adminHandler, hub, []byte("test-secret-that-is-long-enough!!"), []byte("admin-test-secret-32bytes-enough"))
 }
 
 func TestSetupRouter_HealthCheck(t *testing.T) {
@@ -63,6 +87,7 @@ func TestSetupRouter_RoutesExist(t *testing.T) {
 		"POST:/api/v1/restaurants/:restaurantId/tables":         "",
 		"GET:/api/v1/restaurants/:restaurantId/tables":          "",
 		"POST:/api/v1/admin/tables/:id/regenerate-qr":           "",
+		"POST:/api/v1/admin/login":                              "",
 		"GET:/api/v1/ws/:restaurantId":                          "",
 		"GET:/health":                                           "",
 	}
@@ -84,6 +109,7 @@ func TestSetupRouter_IntegrationCreateRestaurant(t *testing.T) {
 	body := `{"name":"Integration Test Restaurant"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/restaurants", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+makeRouterAdminToken(t))
 	router.ServeHTTP(w, req)
 
 	if w.Code != http.StatusCreated {

@@ -224,3 +224,103 @@ func TestPurgeStaleLimiters(t *testing.T) {
 		t.Error("expected fresh IP to remain")
 	}
 }
+
+// ─── AdminAuthMiddleware ──────────────────────────────────────────────────────
+
+var mwAdminSecret = []byte("admin-test-secret-32bytes-enough")
+
+func makeAdminTestToken(expOffset time.Duration) string {
+	claims := auth.AdminClaims{
+		AdminID:      "a1",
+		RestaurantID: "r1",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expOffset)),
+		},
+	}
+	token, _ := auth.SignAdminSession(claims, mwAdminSecret)
+	return token
+}
+
+func TestAdminAuthMiddleware_NoHeader(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	AdminAuthMiddleware(mwAdminSecret)(c)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestAdminAuthMiddleware_InvalidToken(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	c.Request.Header.Set("Authorization", "Bearer invalid.token")
+
+	AdminAuthMiddleware(mwAdminSecret)(c)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestAdminAuthMiddleware_ExpiredToken(t *testing.T) {
+	token := makeAdminTestToken(-1 * time.Minute)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	c.Request.Header.Set("Authorization", "Bearer "+token)
+
+	AdminAuthMiddleware(mwAdminSecret)(c)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestAdminAuthMiddleware_ValidToken(t *testing.T) {
+	token := makeAdminTestToken(24 * time.Hour)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	c.Request.Header.Set("Authorization", "Bearer "+token)
+
+	AdminAuthMiddleware(mwAdminSecret)(c)
+
+	if w.Code == http.StatusUnauthorized {
+		t.Error("expected valid admin token to pass middleware")
+	}
+	claims := GetAdminClaims(c)
+	if claims == nil {
+		t.Fatal("expected admin claims to be set in context")
+	}
+	if claims.AdminID != "a1" {
+		t.Errorf("expected AdminID a1, got %s", claims.AdminID)
+	}
+}
+
+func TestAdminAuthMiddleware_CustomerTokenRejected(t *testing.T) {
+	// A customer session JWT signed with the admin secret must be rejected.
+	sessionClaims := auth.SessionClaims{
+		TableID:      "t1",
+		RestaurantID: "r1",
+		TableNumber:  1,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Minute)),
+		},
+	}
+	token, _ := auth.SignSession(sessionClaims, mwAdminSecret)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	c.Request.Header.Set("Authorization", "Bearer "+token)
+
+	AdminAuthMiddleware(mwAdminSecret)(c)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 for customer token on admin middleware, got %d", w.Code)
+	}
+}

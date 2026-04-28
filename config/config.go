@@ -9,6 +9,7 @@ type Config struct {
 	Port           string
 	DSN            string
 	SessionSecret  string // hex-encoded; validated/decoded in main
+	AdminSecret    string // hex-encoded; validated/decoded in main
 	AllowedOrigins string // comma-separated WS origin allowlist, e.g. "http://localhost:3000,https://app.example.com"
 }
 
@@ -34,6 +35,7 @@ func Load() *Config {
 		Port:           port,
 		DSN:            dsn,
 		SessionSecret:  os.Getenv("SESSION_SECRET"),
+		AdminSecret:    os.Getenv("ADMIN_SECRET"),
 		AllowedOrigins: os.Getenv("ALLOWED_ORIGINS"),
 	}
 }

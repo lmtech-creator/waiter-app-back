@@ -1,6 +1,7 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -79,6 +80,7 @@ func (h *RestaurantHandler) Get(c *gin.Context) {
 // @Param        request       body      dto.CreateTableRequest  true  "Datos de la mesa"
 // @Success      201           {object}  dto.TableResponse
 // @Failure      400           {object}  dto.ErrorResponse
+// @Failure      409           {object}  dto.ErrorResponse
 // @Failure      422           {object}  dto.ErrorResponse
 // @Router       /api/v1/restaurants/{restaurantId}/tables [post]
 func (h *RestaurantHandler) CreateTable(c *gin.Context) {
@@ -95,6 +97,10 @@ func (h *RestaurantHandler) CreateTable(c *gin.Context) {
 		RestaurantID: restaurantID,
 	})
 	if err != nil {
+		if errors.Is(err, usecase.ErrTableNumberExists) {
+			c.JSON(http.StatusConflict, dto.ErrorResponse{Error: "conflict", Message: "ya existe una mesa con ese número en el restaurante"})
+			return
+		}
 		c.JSON(http.StatusUnprocessableEntity, dto.ErrorResponse{Error: "unprocessable_entity", Message: err.Error()})
 		return
 	}

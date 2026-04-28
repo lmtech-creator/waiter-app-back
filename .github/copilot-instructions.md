@@ -1,3 +1,41 @@
+## Reglas de implementación obligatorias
+
+### Build y tests tras cada cambio
+
+Después de **cualquier** implementación (nuevo archivo, modificación de código existente, cambio de firma, nueva ruta, etc.) **SIEMPRE** ejecutar en orden:
+
+```bash
+go build ./...
+go test ./...
+```
+
+Ambos comandos deben terminar con **exit code 0** antes de dar la tarea por finalizada.
+
+### Contrato de no-regresión
+
+- Cada nueva implementación **no debe romper ningún test existente**.
+- Si un test existente falla tras un cambio (por firma actualizada, nueva dependencia, etc.), **corregir el test en el mismo paso** antes de continuar.
+- Los mocks en `mocks/mocks.go` deben ser actualizados **en el mismo commit** que la interfaz que implementan.
+- Los tests de handlers/router deben ser actualizados **en el mismo paso** que las firmas de `SetupRouter` o constructores de handlers.
+
+### Cobertura mínima por capa
+
+| Capa                         | Qué testear                                                                      |
+| ---------------------------- | -------------------------------------------------------------------------------- |
+| `application/usecase`        | Casos feliz + errores de negocio (credenciales inválidas, duplicados, not found) |
+| `interfaces/http`            | Códigos HTTP correctos para inputs válidos e inválidos                           |
+| `infrastructure/auth`        | Sign + Verify para tokens válidos, expirados y con firma incorrecta              |
+| `interfaces/http/middleware` | Token válido pasa, token ausente/inválido devuelve 401                           |
+
+### Cuándo agregar tests
+
+- Cada handler nuevo → test en `*_handler_test.go` del mismo paquete.
+- Cada usecase nuevo → test en `*_test.go` del mismo paquete.
+- Cada middleware nuevo → test en `middleware_test.go`.
+- No crear archivo de test separado si ya existe uno para ese paquete: agregar los casos al archivo existente.
+
+---
+
 ## Swagger / swaggo
 
 Este proyecto usa **swaggo/swag** para documentar la API automáticamente.

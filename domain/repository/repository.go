@@ -12,6 +12,7 @@ type TableRepository interface {
 	Create(table *entity.Table) error
 	FindByID(id string) (*entity.Table, error)
 	FindByRestaurantID(restaurantID string) ([]entity.Table, error)
+	FindByNumberAndRestaurantID(number int, restaurantID string) (*entity.Table, error)
 	FindByQRCode(qrCode string) (*entity.Table, error)
 	UpdateQRCode(id, qrCode string) error
 }
@@ -28,4 +29,10 @@ type RequestRepository interface {
 type FeedbackRepository interface {
 	Create(feedback *entity.Feedback) error
 	FindByTableID(tableID string) ([]entity.Feedback, error)
+}
+
+type AdminRepository interface {
+	FindByUsername(username string) (*entity.AdminUser, error)
+	Create(admin *entity.AdminUser) error
+	ExistsAny() (bool, error)
 }

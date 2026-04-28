@@ -80,6 +80,17 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
+// ─── Admin DTOs ───
+
+type AdminLoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type AdminLoginResponse struct {
+	Token string `json:"token"`
+}
+
 // ─── Mappers: Entity → Response ───
 
 func ToRestaurantResponse(r *entity.Restaurant) RestaurantResponse {

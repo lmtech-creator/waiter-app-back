@@ -47,3 +47,11 @@ type Feedback struct {
 	Comment   string    `json:"comment,omitempty"`
 	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
 }
+
+type AdminUser struct {
+	ID           string    `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	RestaurantID *string   `json:"restaurant_id,omitempty" gorm:"type:uuid;index"`
+	Username     string    `json:"username" gorm:"not null;unique"`
+	PasswordHash string    `json:"-" gorm:"not null"`
+	CreatedAt    time.Time `json:"created_at" gorm:"autoCreateTime"`
+}

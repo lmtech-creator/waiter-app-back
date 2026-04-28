@@ -52,12 +52,13 @@ func (m *RestaurantRepo) FindAll() ([]entity.Restaurant, error) {
 // --- TableRepository Mock ---
 
 type TableRepo struct {
-	Tables             map[string]*entity.Table
-	CreateFn           func(t *entity.Table) error
-	FindByIDFn         func(id string) (*entity.Table, error)
-	FindByRestaurantFn func(restaurantID string) ([]entity.Table, error)
-	FindByQRCodeFn     func(qrCode string) (*entity.Table, error)
-	UpdateQRCodeFn     func(id, qrCode string) error
+	Tables                      map[string]*entity.Table
+	CreateFn                    func(t *entity.Table) error
+	FindByIDFn                  func(id string) (*entity.Table, error)
+	FindByRestaurantFn          func(restaurantID string) ([]entity.Table, error)
+	FindByNumberAndRestaurantFn func(number int, restaurantID string) (*entity.Table, error)
+	FindByQRCodeFn              func(qrCode string) (*entity.Table, error)
+	UpdateQRCodeFn              func(id, qrCode string) error
 }
 
 func NewTableRepo() *TableRepo {
@@ -94,6 +95,18 @@ func (m *TableRepo) FindByRestaurantID(restaurantID string) ([]entity.Table, err
 		}
 	}
 	return list, nil
+}
+
+func (m *TableRepo) FindByNumberAndRestaurantID(number int, restaurantID string) (*entity.Table, error) {
+	if m.FindByNumberAndRestaurantFn != nil {
+		return m.FindByNumberAndRestaurantFn(number, restaurantID)
+	}
+	for _, t := range m.Tables {
+		if t.Number == number && t.RestaurantID == restaurantID {
+			return t, nil
+		}
+	}
+	return nil, fmt.Errorf("table not found")
 }
 
 func (m *TableRepo) FindByQRCode(qrCode string) (*entity.Table, error) {
@@ -261,4 +274,44 @@ func NewNotifier() *Notifier {
 
 func (m *Notifier) Notify(restaurantID string, event any) {
 	m.Events = append(m.Events, NotifiedEvent{RestaurantID: restaurantID, Event: event})
+}
+
+// --- AdminRepository Mock ---
+
+type AdminRepo struct {
+	Admins           map[string]*entity.AdminUser
+	FindByUsernameFn func(username string) (*entity.AdminUser, error)
+	CreateFn         func(admin *entity.AdminUser) error
+	ExistsAnyFn      func() (bool, error)
+}
+
+func NewAdminRepo() *AdminRepo {
+	return &AdminRepo{Admins: make(map[string]*entity.AdminUser)}
+}
+
+func (m *AdminRepo) FindByUsername(username string) (*entity.AdminUser, error) {
+	if m.FindByUsernameFn != nil {
+		return m.FindByUsernameFn(username)
+	}
+	for _, a := range m.Admins {
+		if a.Username == username {
+			return a, nil
+		}
+	}
+	return nil, fmt.Errorf("admin not found")
+}
+
+func (m *AdminRepo) Create(admin *entity.AdminUser) error {
+	if m.CreateFn != nil {
+		return m.CreateFn(admin)
+	}
+	m.Admins[admin.ID] = admin
+	return nil
+}
+
+func (m *AdminRepo) ExistsAny() (bool, error) {
+	if m.ExistsAnyFn != nil {
+		return m.ExistsAnyFn()
+	}
+	return len(m.Admins) > 0, nil
 }

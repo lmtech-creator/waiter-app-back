@@ -2,12 +2,15 @@ package usecase
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/waiter/back/domain/entity"
 	"github.com/waiter/back/domain/repository"
 )
+
+var ErrTableNumberExists = errors.New("table number already exists for this restaurant")
 
 const qrAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
@@ -67,6 +70,10 @@ type CreateTableInput struct {
 func (uc *RestaurantUseCase) CreateTable(input CreateTableInput) (*entity.Table, error) {
 	if _, err := uc.restaurantRepo.FindByID(input.RestaurantID); err != nil {
 		return nil, fmt.Errorf("restaurant not found: %w", err)
+	}
+
+	if existing, _ := uc.tableRepo.FindByNumberAndRestaurantID(input.Number, input.RestaurantID); existing != nil {
+		return nil, ErrTableNumberExists
 	}
 
 	qr, err := generateQRCode(10)

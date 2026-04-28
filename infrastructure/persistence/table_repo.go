@@ -33,6 +33,14 @@ func (r *TableRepo) FindByRestaurantID(restaurantID string) ([]entity.Table, err
 	return tables, nil
 }
 
+func (r *TableRepo) FindByNumberAndRestaurantID(number int, restaurantID string) (*entity.Table, error) {
+	var table entity.Table
+	if err := r.db.First(&table, "number = ? AND restaurant_id = ?", number, restaurantID).Error; err != nil {
+		return nil, err
+	}
+	return &table, nil
+}
+
 func (r *TableRepo) FindByQRCode(qrCode string) (*entity.Table, error) {
 	var table entity.Table
 	if err := r.db.First(&table, "qr_code = ?", qrCode).Error; err != nil {

@@ -1,6 +1,62 @@
 basePath: /api/v1
 definitions:
-  entity.Feedback:
+  dto.AdminLoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  dto.AdminLoginResponse:
+    properties:
+      token:
+        type: string
+    type: object
+  dto.CreateFeedbackRequest:
+    properties:
+      comment:
+        type: string
+      score:
+        maximum: 5
+        minimum: 1
+        type: integer
+      table_id:
+        type: string
+    required:
+    - score
+    - table_id
+    type: object
+  dto.CreateRequestRequest:
+    properties:
+      type:
+        $ref: '#/definitions/entity.RequestType'
+    required:
+    - type
+    type: object
+  dto.CreateRestaurantRequest:
+    properties:
+      name:
+        type: string
+      plan:
+        type: string
+    required:
+    - name
+    type: object
+  dto.CreateTableRequest:
+    properties:
+      number:
+        type: integer
+    required:
+    - number
+    type: object
+  dto.ErrorResponse:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  dto.FeedbackResponse:
     properties:
       comment:
         type: string
@@ -13,7 +69,7 @@ definitions:
       table_id:
         type: string
     type: object
-  entity.Request:
+  dto.RequestResponse:
     properties:
       created_at:
         type: string
@@ -25,6 +81,50 @@ definitions:
         type: string
       type:
         $ref: '#/definitions/entity.RequestType'
+    type: object
+  dto.RestaurantResponse:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      plan:
+        type: string
+    type: object
+  dto.SessionRequest:
+    properties:
+      qr_code:
+        type: string
+    type: object
+  dto.SessionResponse:
+    properties:
+      session_token:
+        type: string
+      table:
+        $ref: '#/definitions/dto.TablePublic'
+    type: object
+  dto.TablePublic:
+    properties:
+      number:
+        type: integer
+    type: object
+  dto.TableResponse:
+    properties:
+      id:
+        type: string
+      number:
+        type: integer
+      qr_code:
+        type: string
+      restaurant_id:
+        type: string
+    type: object
+  dto.UpdateRequestStatusRequest:
+    properties:
+      status:
+        $ref: '#/definitions/entity.RequestStatus'
+    required:
+    - status
     type: object
   entity.RequestStatus:
     enum:
@@ -46,73 +146,6 @@ definitions:
     - CallWaiter
     - AskBill
     - AskHelp
-  entity.Restaurant:
-    properties:
-      id:
-        type: string
-      name:
-        type: string
-      plan:
-        type: string
-    type: object
-  entity.Table:
-    properties:
-      id:
-        type: string
-      number:
-        type: integer
-      qr_code:
-        type: string
-      restaurant_id:
-        type: string
-    type: object
-  http.createTableInput:
-    properties:
-      number:
-        type: integer
-    required:
-    - number
-    type: object
-  http.updateRequestInput:
-    properties:
-      status:
-        $ref: '#/definitions/entity.RequestStatus'
-    required:
-    - status
-    type: object
-  usecase.CreateFeedbackInput:
-    properties:
-      comment:
-        type: string
-      score:
-        maximum: 5
-        minimum: 1
-        type: integer
-      table_id:
-        type: string
-    required:
-    - score
-    - table_id
-    type: object
-  usecase.CreateRequestInput:
-    properties:
-      table_id:
-        type: string
-      type:
-        $ref: '#/definitions/entity.RequestType'
-    required:
-    - table_id
-    - type
-    type: object
-  usecase.CreateRestaurantInput:
-    properties:
-      name:
-        type: string
-      plan:
-        type: string
-    required:
-    - name
-    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -120,6 +153,70 @@ info:
   title: Waiter API
   version: "1.0"
 paths:
+  /api/v1/admin/login:
+    post:
+      consumes:
+      - application/json
+      description: Valida credenciales y retorna un JWT de administrador con duración
+        de 24 horas
+      parameters:
+      - description: Credenciales de administrador
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AdminLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AdminLoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Login de administrador
+      tags:
+      - admin
+  /api/v1/admin/tables/{id}/regenerate-qr:
+    post:
+      description: Genera un nuevo código QR aleatorio para una mesa (admin)
+      parameters:
+      - description: ID de la mesa
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Regenerar QR de mesa
+      tags:
+      - tables
   /api/v1/feedback:
     post:
       consumes:
@@ -131,26 +228,22 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/usecase.CreateFeedbackInput'
+          $ref: '#/definitions/dto.CreateFeedbackRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/entity.Feedback'
+            $ref: '#/definitions/dto.FeedbackResponse'
         "400":
           description: Bad Request
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/dto.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: Registrar feedback
       tags:
       - feedback
@@ -158,23 +251,33 @@ paths:
     post:
       consumes:
       - application/json
-      description: Crea una nueva solicitud de mesa (llamar mozo, pedir cuenta, ayuda)
+      description: Crea una nueva solicitud de mesa (llamar mozo, pedir cuenta, ayuda).
+        Requiere JWT de sesión.
       parameters:
-      - description: Datos de la solicitud
+      - description: Bearer <session_token>
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Tipo de solicitud
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/usecase.CreateRequestInput'
+          $ref: '#/definitions/dto.CreateRequestRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/entity.Request'
+            $ref: '#/definitions/dto.RequestResponse'
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "401":
+          description: Unauthorized
           schema:
             additionalProperties:
               type: string
@@ -182,9 +285,11 @@ paths:
         "422":
           description: Unprocessable Entity
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/dto.ErrorResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: Crear solicitud
       tags:
       - requests
@@ -204,7 +309,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/http.updateRequestInput'
+          $ref: '#/definitions/dto.UpdateRequestStatusRequest'
       produces:
       - application/json
       responses:
@@ -213,15 +318,11 @@ paths:
         "400":
           description: Bad Request
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/dto.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: Actualizar estado de solicitud
       tags:
       - requests
@@ -236,26 +337,22 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/usecase.CreateRestaurantInput'
+          $ref: '#/definitions/dto.CreateRestaurantRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/entity.Restaurant'
+            $ref: '#/definitions/dto.RestaurantResponse'
         "400":
           description: Bad Request
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/dto.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: Crear restaurante
       tags:
       - restaurants
@@ -274,13 +371,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.Restaurant'
+            $ref: '#/definitions/dto.RestaurantResponse'
         "404":
           description: Not Found
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: Obtener restaurante
       tags:
       - restaurants
@@ -300,14 +395,12 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/entity.Request'
+              $ref: '#/definitions/dto.RequestResponse'
             type: array
         "500":
           description: Internal Server Error
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: Obtener solicitudes activas
       tags:
       - requests
@@ -327,14 +420,12 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/entity.Table'
+              $ref: '#/definitions/dto.TableResponse'
             type: array
         "500":
           description: Internal Server Error
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: Listar mesas
       tags:
       - tables
@@ -353,29 +444,70 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/http.createTableInput'
+          $ref: '#/definitions/dto.CreateTableRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/entity.Table'
+            $ref: '#/definitions/dto.TableResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Crear mesa
+      tags:
+      - tables
+  /api/v1/session:
+    post:
+      consumes:
+      - application/json
+      description: Valida el código QR de una mesa y devuelve un JWT de sesión (30
+        min)
+      parameters:
+      - description: Código QR de la mesa
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SessionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SessionResponse'
         "400":
           description: Bad Request
           schema:
             additionalProperties:
               type: string
             type: object
-        "422":
-          description: Unprocessable Entity
+        "403":
+          description: Forbidden
           schema:
             additionalProperties:
               type: string
             type: object
-      summary: Crear mesa
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Iniciar sesión con QR
       tags:
-      - tables
+      - session
   /api/v1/tables/{tableId}/status:
     get:
       description: Retorna las solicitudes de una mesa específica
@@ -392,15 +524,46 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/entity.Request'
+              $ref: '#/definitions/dto.RequestResponse'
             type: array
         "500":
           description: Internal Server Error
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/dto.ErrorResponse'
       summary: Obtener estado de mesa
       tags:
       - requests
+  /api/v1/ws/{restaurantId}:
+    get:
+      description: Acepta JWT de admin (admin_secret) o de sesión de cliente. Requiere
+        ?token=<jwt>
+      parameters:
+      - description: ID del restaurante
+        in: path
+        name: restaurantId
+        required: true
+        type: string
+      - description: JWT de admin o de sesión de cliente
+        in: query
+        name: token
+        required: true
+        type: string
+      responses:
+        "101":
+          description: Switching Protocols
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Conectar al WebSocket del restaurante
+      tags:
+      - websocket
 swagger: "2.0"
