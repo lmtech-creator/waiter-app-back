@@ -6,12 +6,12 @@ import (
 )
 
 type Config struct {
-	Port              string
-	DSN               string
-	SessionSecret     string // hex-encoded; validated/decoded in main
-	AdminSecret       string // hex-encoded; validated/decoded in main
-	AllowedOrigins    string // comma-separated WS origin allowlist
-	SeedRestaurantID  string // optional: UUID of restaurant to seed initial admin for
+	Port             string
+	DSN              string
+	SessionSecret    string // hex-encoded; validated/decoded in main
+	AdminSecret      string // hex-encoded; validated/decoded in main
+	AllowedOrigins   string // comma-separated WS origin allowlist
+	SeedRestaurantID string // optional: UUID of restaurant to seed initial admin for
 }
 
 func Load() *Config {
