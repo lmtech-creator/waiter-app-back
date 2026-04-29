@@ -14,6 +14,7 @@ import (
 )
 
 var ErrInvalidCredentials = errors.New("credenciales incorrectas")
+var ErrRestaurantIDRequired = errors.New("restaurant_id es requerido para crear un admin")
 
 type AdminUseCase struct {
 	repo        repository.AdminRepository
@@ -47,14 +48,9 @@ func (uc *AdminUseCase) Login(input AdminLoginInput) (*AdminLoginOutput, error) 
 		return nil, ErrInvalidCredentials
 	}
 
-	restaurantID := ""
-	if admin.RestaurantID != nil {
-		restaurantID = *admin.RestaurantID
-	}
-
 	token, err := auth.SignAdminSession(auth.AdminClaims{
 		AdminID:      admin.ID,
-		RestaurantID: restaurantID,
+		RestaurantID: admin.RestaurantID,
 	}, uc.adminSecret)
 	if err != nil {
 		return nil, fmt.Errorf("error signing token: %w", err)
@@ -64,8 +60,13 @@ func (uc *AdminUseCase) Login(input AdminLoginInput) (*AdminLoginOutput, error) 
 }
 
 // SeedAdminIfNeeded creates an "admin" user on first startup if none exists yet.
+// restaurantID must be a valid UUID — if empty, seed is skipped.
 // The generated password is logged and must be changed immediately in production.
-func SeedAdminIfNeeded(repo repository.AdminRepository) (seeded bool, username, password string, err error) {
+func SeedAdminIfNeeded(repo repository.AdminRepository, restaurantID string) (seeded bool, username, password string, err error) {
+	if restaurantID == "" {
+		return false, "", "", nil
+	}
+
 	exists, err := repo.ExistsAny()
 	if err != nil {
 		return false, "", "", fmt.Errorf("checking admin existence: %w", err)
@@ -86,6 +87,7 @@ func SeedAdminIfNeeded(repo repository.AdminRepository) (seeded bool, username, 
 
 	admin := &entity.AdminUser{
 		ID:           uuid.New().String(),
+		RestaurantID: restaurantID,
 		Username:     "admin",
 		PasswordHash: string(hash),
 	}

@@ -58,14 +58,18 @@ func main() {
 	restaurantUC := usecase.NewRestaurantUseCase(restaurantRepo, tableRepo)
 	adminUC := usecase.NewAdminUseCase(adminRepo, adminSecret)
 
-	// Seed admin user on first run
-	if seeded, username, password, err := usecase.SeedAdminIfNeeded(adminRepo); err != nil {
+	// Seed admin user on first run.
+	// Only runs if SEED_ADMIN_RESTAURANT_ID is set in the environment.
+	if seeded, username, password, err := usecase.SeedAdminIfNeeded(adminRepo, cfg.SeedRestaurantID); err != nil {
 		zap.L().Error("failed to seed admin user", zap.Error(err))
 	} else if seeded {
 		zap.L().Info("admin user created — change this password immediately",
 			zap.String("username", username),
 			zap.String("password", password),
+			zap.String("restaurant_id", cfg.SeedRestaurantID),
 		)
+	} else if cfg.SeedRestaurantID == "" {
+		zap.L().Info("admin seed skipped: set SEED_ADMIN_RESTAURANT_ID to auto-create the first admin")
 	}
 
 	// Handlers

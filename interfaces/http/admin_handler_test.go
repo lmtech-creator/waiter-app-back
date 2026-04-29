@@ -42,7 +42,7 @@ func TestAdminHandler_Login_Success(t *testing.T) {
 	rid := uuid.New().String()
 	repo.Admins["a1"] = &entity.AdminUser{
 		ID:           "a1",
-		RestaurantID: &rid,
+		RestaurantID: rid,
 		Username:     "admin",
 		PasswordHash: hashForTest(t, "secret123"),
 	}

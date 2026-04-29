@@ -6,11 +6,12 @@ import (
 )
 
 type Config struct {
-	Port           string
-	DSN            string
-	SessionSecret  string // hex-encoded; validated/decoded in main
-	AdminSecret    string // hex-encoded; validated/decoded in main
-	AllowedOrigins string // comma-separated WS origin allowlist, e.g. "http://localhost:3000,https://app.example.com"
+	Port              string
+	DSN               string
+	SessionSecret     string // hex-encoded; validated/decoded in main
+	AdminSecret       string // hex-encoded; validated/decoded in main
+	AllowedOrigins    string // comma-separated WS origin allowlist
+	SeedRestaurantID  string // optional: UUID of restaurant to seed initial admin for
 }
 
 func Load() *Config {
@@ -32,11 +33,12 @@ func Load() *Config {
 	}
 
 	return &Config{
-		Port:           port,
-		DSN:            dsn,
-		SessionSecret:  os.Getenv("SESSION_SECRET"),
-		AdminSecret:    os.Getenv("ADMIN_SECRET"),
-		AllowedOrigins: os.Getenv("ALLOWED_ORIGINS"),
+		Port:             port,
+		DSN:              dsn,
+		SessionSecret:    os.Getenv("SESSION_SECRET"),
+		AdminSecret:      os.Getenv("ADMIN_SECRET"),
+		AllowedOrigins:   os.Getenv("ALLOWED_ORIGINS"),
+		SeedRestaurantID: os.Getenv("SEED_ADMIN_RESTAURANT_ID"),
 	}
 }
 

@@ -25,7 +25,7 @@ func TestAdminLogin_Success(t *testing.T) {
 	rid := uuid.New().String()
 	repo.Admins["a1"] = &entity.AdminUser{
 		ID:           "a1",
-		RestaurantID: &rid,
+		RestaurantID: rid,
 		Username:     "admin",
 		PasswordHash: hashPassword(t, "password123"),
 	}
@@ -78,7 +78,8 @@ func TestAdminLogin_EmptyFields(t *testing.T) {
 
 func TestSeedAdminIfNeeded_CreatesAdmin(t *testing.T) {
 	repo := mocks.NewAdminRepo()
-	seeded, username, password, err := SeedAdminIfNeeded(repo)
+	rid := uuid.New().String()
+	seeded, username, password, err := SeedAdminIfNeeded(repo, rid)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -91,17 +92,34 @@ func TestSeedAdminIfNeeded_CreatesAdmin(t *testing.T) {
 	if len(repo.Admins) != 1 {
 		t.Errorf("expected 1 admin in repo, got %d", len(repo.Admins))
 	}
+	// Verify restaurant_id was set
+	for _, a := range repo.Admins {
+		if a.RestaurantID != rid {
+			t.Errorf("expected restaurant_id %s, got %s", rid, a.RestaurantID)
+		}
+	}
 }
 
 func TestSeedAdminIfNeeded_SkipsIfExists(t *testing.T) {
 	repo := mocks.NewAdminRepo()
-	repo.Admins["existing"] = &entity.AdminUser{ID: "existing", Username: "admin"}
+	repo.Admins["existing"] = &entity.AdminUser{ID: "existing", Username: "admin", RestaurantID: "r1"}
 
-	seeded, _, _, err := SeedAdminIfNeeded(repo)
+	seeded, _, _, err := SeedAdminIfNeeded(repo, "r1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if seeded {
 		t.Error("expected seed to be skipped when admin already exists")
+	}
+}
+
+func TestSeedAdminIfNeeded_SkipsIfNoRestaurantID(t *testing.T) {
+	repo := mocks.NewAdminRepo()
+	seeded, _, _, err := SeedAdminIfNeeded(repo, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if seeded {
+		t.Error("expected seed to be skipped when restaurant_id is empty")
 	}
 }

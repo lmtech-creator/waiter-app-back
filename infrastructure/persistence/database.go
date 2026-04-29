@@ -30,10 +30,9 @@ func NewDatabase(dsn string) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	// Ensure restaurant_id is nullable on admin_users (column may have been
-	// created as NOT NULL before this migration ran).
-	if err := db.Exec(`ALTER TABLE admin_users ALTER COLUMN restaurant_id DROP NOT NULL`).Error; err != nil {
-		slog.Warn("could not drop NOT NULL on admin_users.restaurant_id (may already be nullable)", "error", err)
+	// Ensure restaurant_id is NOT NULL on admin_users (enforce constraint after AutoMigrate).
+	if err := db.Exec(`ALTER TABLE admin_users ALTER COLUMN restaurant_id SET NOT NULL`).Error; err != nil {
+		slog.Warn("could not set NOT NULL on admin_users.restaurant_id", "error", err)
 	}
 
 	slog.Info("database migrations completed")
