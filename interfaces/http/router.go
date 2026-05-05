@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"github.com/waiter/back/domain/entity"
 	ws "github.com/waiter/back/infrastructure/websocket"
 	mw "github.com/waiter/back/interfaces/http/middleware"
 )
@@ -58,17 +59,49 @@ func SetupRouter(
 	api.GET("/tables/:tableId/status", requestHandler.GetTableStatus)
 	api.POST("/feedback", feedbackHandler.Create)
 
-	// Admin protected routes
-	adminGroup := api.Group("")
-	adminGroup.Use(mw.AdminAuthMiddleware(adminSecret))
+	// All admin-authenticated routes share this base middleware.
+	adminBase := api.Group("")
+	adminBase.Use(mw.AdminAuthMiddleware(adminSecret))
 	{
-		adminGroup.GET("/restaurants/:restaurantId/requests/active", requestHandler.GetActive)
-		adminGroup.PATCH("/requests/:requestId", requestHandler.Complete)
-		adminGroup.POST("/restaurants", restaurantHandler.Create)
-		adminGroup.GET("/restaurants/:restaurantId", restaurantHandler.Get)
-		adminGroup.POST("/restaurants/:restaurantId/tables", restaurantHandler.CreateTable)
-		adminGroup.GET("/restaurants/:restaurantId/tables", restaurantHandler.GetTables)
-		adminGroup.POST("/admin/tables/:id/regenerate-qr", restaurantHandler.RegenerateQR)
+		// ── Superadmin only ──────────────────────────────────────────────────
+		superadmin := adminBase.Group("")
+		superadmin.Use(mw.RequireRole(entity.RoleSuperAdmin))
+		{
+			superadmin.GET("/restaurants", restaurantHandler.GetAll)
+			superadmin.POST("/restaurants", restaurantHandler.Create)
+		}
+
+		// ── User management: superadmin can do everything; owner can manage
+		// employees of their own restaurant. The handler enforces the distinction.
+		userMgmt := adminBase.Group("")
+		userMgmt.Use(mw.RequireRole(entity.RoleSuperAdmin, entity.RoleOwner))
+		{
+			userMgmt.POST("/admin/users", adminHandler.CreateUser)
+			userMgmt.GET("/admin/users", adminHandler.ListUsers)
+			userMgmt.DELETE("/admin/users/:id", adminHandler.DeleteUser)
+		}
+
+		// ── Owner + Superadmin (with restaurant scope) ───────────────────────
+		ownerOrAbove := adminBase.Group("")
+		ownerOrAbove.Use(mw.RequireRole(entity.RoleOwner, entity.RoleSuperAdmin))
+		ownerOrAbove.Use(mw.RequireRestaurantScope())
+		{
+			ownerOrAbove.GET("/restaurants/:restaurantId", restaurantHandler.Get)
+			ownerOrAbove.POST("/restaurants/:restaurantId/tables", restaurantHandler.CreateTable)
+			ownerOrAbove.GET("/restaurants/:restaurantId/tables", restaurantHandler.GetTables)
+			ownerOrAbove.POST("/admin/tables/:id/regenerate-qr", restaurantHandler.RegenerateQR)
+		}
+
+		// ── Employee + Owner + Superadmin (operational routes) ───────────────
+		operational := adminBase.Group("")
+		operational.Use(mw.RequireRole(entity.RoleEmployee, entity.RoleOwner, entity.RoleSuperAdmin))
+		operational.Use(mw.RequireRestaurantScope())
+		{
+			operational.GET("/restaurants/:restaurantId/requests/active", requestHandler.GetActive)
+		}
+
+		// Complete request: available to all admin roles
+		adminBase.PATCH("/requests/:requestId", requestHandler.Complete)
 	}
 
 	// WebSocket

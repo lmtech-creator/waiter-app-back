@@ -69,6 +69,11 @@ const docTemplate = `{
         },
         "/api/v1/admin/tables/{id}/regenerate-qr": {
             "post": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
                 "description": "Genera un nuevo código QR aleatorio para una mesa (admin)",
                 "produces": [
                     "application/json"
@@ -104,6 +109,138 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/users": {
+            "get": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
+                "description": "Superadmin ve todos los usuarios; owner ve solo los employees de su restaurante.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Listar usuarios administradores",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.AdminUserResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
+                "description": "Crea un nuevo usuario owner o employee. Superadmin puede crear cualquier rol; owner solo puede crear employees de su restaurante.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Crear usuario administrador",
+                "parameters": [
+                    {
+                        "description": "Datos del nuevo usuario",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreateAdminUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminUserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/users/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
+                "description": "Superadmin puede eliminar cualquier usuario; owner solo puede eliminar employees de su restaurante.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Eliminar usuario administrador",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del usuario",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/dto.ErrorResponse"
                         }
@@ -159,6 +296,11 @@ const docTemplate = `{
         },
         "/api/v1/requests": {
             "post": {
+                "security": [
+                    {
+                        "SessionToken": []
+                    }
+                ],
                 "description": "Crea una nueva solicitud de mesa (llamar mozo, pedir cuenta, ayuda). Requiere JWT de sesión.",
                 "consumes": [
                     "application/json"
@@ -227,6 +369,11 @@ const docTemplate = `{
         },
         "/api/v1/requests/{requestId}": {
             "patch": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
                 "description": "Actualiza el estado de una solicitud (marcar como atendida)",
                 "consumes": [
                     "application/json"
@@ -276,7 +423,44 @@ const docTemplate = `{
             }
         },
         "/api/v1/restaurants": {
+            "get": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
+                "description": "Retorna todos los restaurantes del sistema (solo superadmin)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "restaurants"
+                ],
+                "summary": "Listar todos los restaurantes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.RestaurantResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "post": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
                 "description": "Crea un nuevo restaurante",
                 "consumes": [
                     "application/json"
@@ -323,6 +507,11 @@ const docTemplate = `{
         },
         "/api/v1/restaurants/{restaurantId}": {
             "get": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
                 "description": "Retorna un restaurante por su ID",
                 "produces": [
                     "application/json"
@@ -358,6 +547,11 @@ const docTemplate = `{
         },
         "/api/v1/restaurants/{restaurantId}/requests/active": {
             "get": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
                 "description": "Retorna las solicitudes activas de un restaurante",
                 "produces": [
                     "application/json"
@@ -396,6 +590,11 @@ const docTemplate = `{
         },
         "/api/v1/restaurants/{restaurantId}/tables": {
             "get": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
                 "description": "Retorna las mesas de un restaurante",
                 "produces": [
                     "application/json"
@@ -432,6 +631,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
                 "description": "Crea una nueva mesa para un restaurante",
                 "consumes": [
                     "application/json"
@@ -657,6 +861,48 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.AdminUserResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "restaurant_id": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.CreateAdminUserRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "role",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "restaurant_id": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.CreateFeedbackRequest": {
             "type": "object",
             "required": [
@@ -858,6 +1104,20 @@ const docTemplate = `{
                 "AskBill",
                 "AskHelp"
             ]
+        }
+    },
+    "securityDefinitions": {
+        "AdminToken": {
+            "description": "JWT de administrador. Formato: \"Bearer \u003ctoken\u003e\"",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        },
+        "SessionToken": {
+            "description": "JWT de sesión de cliente (QR). Formato: \"Bearer \u003ctoken\u003e\"",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`

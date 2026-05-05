@@ -35,6 +35,7 @@ func NewRequestHandler(uc *usecase.RequestUseCase) *RequestHandler {
 // @Failure      401            {object}  map[string]string
 // @Failure      422            {object}  dto.ErrorResponse
 // @Failure      429            {object}  dto.ErrorResponse
+// @Security     SessionToken
 // @Router       /api/v1/requests [post]
 func (h *RequestHandler) Create(c *gin.Context) {
 	var req dto.CreateRequestRequest
@@ -96,6 +97,7 @@ func (h *RequestHandler) Create(c *gin.Context) {
 // @Param        restaurantId  path      string  true  "ID del restaurante"
 // @Success      200           {array}   dto.RequestResponse
 // @Failure      500           {object}  dto.ErrorResponse
+// @Security     AdminToken
 // @Router       /api/v1/restaurants/{restaurantId}/requests/active [get]
 func (h *RequestHandler) GetActive(c *gin.Context) {
 	restaurantID := c.Param("restaurantId")
@@ -120,6 +122,7 @@ func (h *RequestHandler) GetActive(c *gin.Context) {
 // @Success      204
 // @Failure      400        {object}  dto.ErrorResponse
 // @Failure      422        {object}  dto.ErrorResponse
+// @Security     AdminToken
 // @Router       /api/v1/requests/{requestId} [patch]
 func (h *RequestHandler) Complete(c *gin.Context) {
 	id := c.Param("requestId")

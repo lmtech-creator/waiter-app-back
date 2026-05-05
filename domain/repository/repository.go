@@ -33,6 +33,10 @@ type FeedbackRepository interface {
 
 type AdminRepository interface {
 	FindByUsername(username string) (*entity.AdminUser, error)
+	FindByID(id string) (*entity.AdminUser, error)
+	FindByRestaurantID(restaurantID string) ([]entity.AdminUser, error)
+	FindAll() ([]entity.AdminUser, error)
 	Create(admin *entity.AdminUser) error
 	ExistsAny() (bool, error)
+	DeleteByID(id string) error
 }

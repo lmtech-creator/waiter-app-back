@@ -29,6 +29,7 @@ func NewRestaurantHandler(uc *usecase.RestaurantUseCase) *RestaurantHandler {
 // @Success      201      {object}  dto.RestaurantResponse
 // @Failure      400      {object}  dto.ErrorResponse
 // @Failure      422      {object}  dto.ErrorResponse
+// @Security     AdminToken
 // @Router       /api/v1/restaurants [post]
 func (h *RestaurantHandler) Create(c *gin.Context) {
 	var req dto.CreateRestaurantRequest
@@ -57,6 +58,7 @@ func (h *RestaurantHandler) Create(c *gin.Context) {
 // @Param        restaurantId  path      string  true  "ID del restaurante"
 // @Success      200           {object}  dto.RestaurantResponse
 // @Failure      404           {object}  dto.ErrorResponse
+// @Security     AdminToken
 // @Router       /api/v1/restaurants/{restaurantId} [get]
 func (h *RestaurantHandler) Get(c *gin.Context) {
 	id := c.Param("restaurantId")
@@ -68,6 +70,29 @@ func (h *RestaurantHandler) Get(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.ToRestaurantResponse(r))
+}
+
+// GetAll godoc
+// @Summary      Listar todos los restaurantes
+// @Description  Retorna todos los restaurantes del sistema (solo superadmin)
+// @Tags         restaurants
+// @Produce      json
+// @Success      200  {array}   dto.RestaurantResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Security     AdminToken
+// @Router       /api/v1/restaurants [get]
+func (h *RestaurantHandler) GetAll(c *gin.Context) {
+	restaurants, err := h.uc.GetAllRestaurants()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "internal_error", Message: err.Error()})
+		return
+	}
+
+	out := make([]dto.RestaurantResponse, len(restaurants))
+	for i, r := range restaurants {
+		out[i] = dto.ToRestaurantResponse(&r)
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 // CreateTable godoc
@@ -82,6 +107,7 @@ func (h *RestaurantHandler) Get(c *gin.Context) {
 // @Failure      400           {object}  dto.ErrorResponse
 // @Failure      409           {object}  dto.ErrorResponse
 // @Failure      422           {object}  dto.ErrorResponse
+// @Security     AdminToken
 // @Router       /api/v1/restaurants/{restaurantId}/tables [post]
 func (h *RestaurantHandler) CreateTable(c *gin.Context) {
 	restaurantID := c.Param("restaurantId")
@@ -116,6 +142,7 @@ func (h *RestaurantHandler) CreateTable(c *gin.Context) {
 // @Param        restaurantId  path      string  true  "ID del restaurante"
 // @Success      200           {array}   dto.TableResponse
 // @Failure      500           {object}  dto.ErrorResponse
+// @Security     AdminToken
 // @Router       /api/v1/restaurants/{restaurantId}/tables [get]
 func (h *RestaurantHandler) GetTables(c *gin.Context) {
 	restaurantID := c.Param("restaurantId")
@@ -138,6 +165,7 @@ func (h *RestaurantHandler) GetTables(c *gin.Context) {
 // @Success      200  {object}  map[string]string
 // @Failure      404  {object}  dto.ErrorResponse
 // @Failure      500  {object}  dto.ErrorResponse
+// @Security     AdminToken
 // @Router       /api/v1/admin/tables/{id}/regenerate-qr [post]
 func (h *RestaurantHandler) RegenerateQR(c *gin.Context) {
 	tableID := c.Param("id")

@@ -233,6 +233,7 @@ func makeAdminTestToken(expOffset time.Duration) string {
 	claims := auth.AdminClaims{
 		AdminID:      "a1",
 		RestaurantID: "r1",
+		Role:         "owner",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expOffset)),
 		},
@@ -322,5 +323,102 @@ func TestAdminAuthMiddleware_CustomerTokenRejected(t *testing.T) {
 
 	if w.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401 for customer token on admin middleware, got %d", w.Code)
+	}
+}
+
+// ─── RequireRole ──────────────────────────────────────────────────────────────
+
+func TestRequireRole_AllowedRole(t *testing.T) {
+	token := makeAdminTestToken(24 * time.Hour)
+	w := httptest.NewRecorder()
+	c, r := gin.CreateTestContext(w)
+	_ = r
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	c.Request.Header.Set("Authorization", "Bearer "+token)
+
+	// Simulate AdminAuthMiddleware having run.
+	claims, _ := auth.VerifyAdminSession(token, mwAdminSecret)
+	c.Set(AdminClaimsKey, claims)
+
+	RequireRole("owner")(c)
+
+	if w.Code == http.StatusForbidden {
+		t.Error("expected allowed role to pass")
+	}
+}
+
+func TestRequireRole_ForbiddenRole(t *testing.T) {
+	token := makeAdminTestToken(24 * time.Hour) // role = "owner"
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	claims, _ := auth.VerifyAdminSession(token, mwAdminSecret)
+	c.Set(AdminClaimsKey, claims)
+
+	RequireRole("superadmin")(c)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for wrong role, got %d", w.Code)
+	}
+}
+
+func TestRequireRole_NoClaims(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	RequireRole("owner")(c)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403 when no claims, got %d", w.Code)
+	}
+}
+
+// ─── RequireRestaurantScope ───────────────────────────────────────────────────
+
+func TestRequireRestaurantScope_SuperadminPassesAny(t *testing.T) {
+	claims := &auth.AdminClaims{AdminID: "a1", RestaurantID: "", Role: "superadmin"}
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	c.Set(AdminClaimsKey, claims)
+	// Simulate :restaurantId param
+	c.Params = []gin.Param{{Key: "restaurantId", Value: "some-other-restaurant"}}
+
+	RequireRestaurantScope()(c)
+
+	if w.Code == http.StatusForbidden {
+		t.Error("superadmin should pass restaurant scope check")
+	}
+}
+
+func TestRequireRestaurantScope_OwnerSameRestaurant(t *testing.T) {
+	claims := &auth.AdminClaims{AdminID: "a1", RestaurantID: "r1", Role: "owner"}
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	c.Set(AdminClaimsKey, claims)
+	c.Params = []gin.Param{{Key: "restaurantId", Value: "r1"}}
+
+	RequireRestaurantScope()(c)
+
+	if w.Code == http.StatusForbidden {
+		t.Error("owner should pass scope check for their own restaurant")
+	}
+}
+
+func TestRequireRestaurantScope_OwnerDifferentRestaurant(t *testing.T) {
+	claims := &auth.AdminClaims{AdminID: "a1", RestaurantID: "r1", Role: "owner"}
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+	c.Set(AdminClaimsKey, claims)
+	c.Params = []gin.Param{{Key: "restaurantId", Value: "r2"}}
+
+	RequireRestaurantScope()(c)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for owner accessing different restaurant, got %d", w.Code)
 	}
 }

@@ -48,10 +48,19 @@ type Feedback struct {
 	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
 }
 
+type AdminRole string
+
+const (
+	RoleSuperAdmin AdminRole = "superadmin"
+	RoleOwner      AdminRole = "owner"
+	RoleEmployee   AdminRole = "employee"
+)
+
 type AdminUser struct {
 	ID           string    `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	RestaurantID string    `json:"restaurant_id" gorm:"type:uuid;not null;index"`
+	RestaurantID *string   `json:"restaurant_id,omitempty" gorm:"type:uuid;index"`
 	Username     string    `json:"username" gorm:"not null;unique"`
 	PasswordHash string    `json:"-" gorm:"not null"`
+	Role         AdminRole `json:"role" gorm:"type:varchar(20);not null;default:employee"`
 	CreatedAt    time.Time `json:"created_at" gorm:"autoCreateTime"`
 }

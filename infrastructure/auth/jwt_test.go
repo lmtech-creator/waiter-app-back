@@ -113,6 +113,7 @@ func makeAdminClaims(expOffset time.Duration) AdminClaims {
 	return AdminClaims{
 		AdminID:      "admin-1",
 		RestaurantID: "r1",
+		Role:         "owner",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expOffset)),
 		},
@@ -143,6 +144,9 @@ func TestVerifyAdminSession_Valid(t *testing.T) {
 	}
 	if got.RestaurantID != "r1" {
 		t.Errorf("expected RestaurantID r1, got %s", got.RestaurantID)
+	}
+	if got.Role != "owner" {
+		t.Errorf("expected Role owner, got %s", got.Role)
 	}
 }
 

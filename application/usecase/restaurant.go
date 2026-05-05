@@ -62,6 +62,10 @@ func (uc *RestaurantUseCase) GetRestaurant(id string) (*entity.Restaurant, error
 	return uc.restaurantRepo.FindByID(id)
 }
 
+func (uc *RestaurantUseCase) GetAllRestaurants() ([]entity.Restaurant, error) {
+	return uc.restaurantRepo.FindAll()
+}
+
 type CreateTableInput struct {
 	Number       int    `json:"number" binding:"required"`
 	RestaurantID string `json:"restaurant_id" binding:"required"`

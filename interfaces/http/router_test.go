@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/waiter/back/application/usecase"
+	"github.com/waiter/back/domain/entity"
 	"github.com/waiter/back/infrastructure/auth"
 	ws "github.com/waiter/back/infrastructure/websocket"
 	"github.com/waiter/back/mocks"
@@ -22,6 +23,7 @@ func makeRouterAdminToken(t *testing.T) string {
 	claims := auth.AdminClaims{
 		AdminID:      "admin-1",
 		RestaurantID: "r1",
+		Role:         string(entity.RoleSuperAdmin),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 		},
@@ -83,11 +85,15 @@ func TestSetupRouter_RoutesExist(t *testing.T) {
 		"GET:/api/v1/restaurants/:restaurantId/requests/active": "",
 		"PATCH:/api/v1/requests/:requestId":                     "",
 		"POST:/api/v1/restaurants":                              "",
+		"GET:/api/v1/restaurants":                               "",
 		"GET:/api/v1/restaurants/:restaurantId":                 "",
 		"POST:/api/v1/restaurants/:restaurantId/tables":         "",
 		"GET:/api/v1/restaurants/:restaurantId/tables":          "",
 		"POST:/api/v1/admin/tables/:id/regenerate-qr":           "",
 		"POST:/api/v1/admin/login":                              "",
+		"POST:/api/v1/admin/users":                              "",
+		"GET:/api/v1/admin/users":                               "",
+		"DELETE:/api/v1/admin/users/:id":                        "",
 		"GET:/api/v1/ws/:restaurantId":                          "",
 		"GET:/health":                                           "",
 	}

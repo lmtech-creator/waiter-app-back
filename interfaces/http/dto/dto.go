@@ -91,6 +91,21 @@ type AdminLoginResponse struct {
 	Token string `json:"token"`
 }
 
+type CreateAdminUserRequest struct {
+	Username     string `json:"username" binding:"required"`
+	Password     string `json:"password" binding:"required"`
+	Role         string `json:"role" binding:"required"`
+	RestaurantID string `json:"restaurant_id"`
+}
+
+type AdminUserResponse struct {
+	ID           string    `json:"id"`
+	Username     string    `json:"username"`
+	Role         string    `json:"role"`
+	RestaurantID *string   `json:"restaurant_id,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
 // ─── Mappers: Entity → Response ───
 
 func ToRestaurantResponse(r *entity.Restaurant) RestaurantResponse {
@@ -150,6 +165,24 @@ func ToFeedbackListResponse(feedbacks []entity.Feedback) []FeedbackResponse {
 	out := make([]FeedbackResponse, len(feedbacks))
 	for i, f := range feedbacks {
 		out[i] = ToFeedbackResponse(&f)
+	}
+	return out
+}
+
+func ToAdminUserResponse(a *entity.AdminUser) AdminUserResponse {
+	return AdminUserResponse{
+		ID:           a.ID,
+		Username:     a.Username,
+		Role:         string(a.Role),
+		RestaurantID: a.RestaurantID,
+		CreatedAt:    a.CreatedAt,
+	}
+}
+
+func ToAdminUserListResponse(users []entity.AdminUser) []AdminUserResponse {
+	out := make([]AdminUserResponse, len(users))
+	for i, u := range users {
+		out[i] = ToAdminUserResponse(&u)
 	}
 	return out
 }

@@ -12,6 +12,34 @@ definitions:
       token:
         type: string
     type: object
+  dto.AdminUserResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      restaurant_id:
+        type: string
+      role:
+        type: string
+      username:
+        type: string
+    type: object
+  dto.CreateAdminUserRequest:
+    properties:
+      password:
+        type: string
+      restaurant_id:
+        type: string
+      role:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - role
+    - username
+    type: object
   dto.CreateFeedbackRequest:
     properties:
       comment:
@@ -214,9 +242,97 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
       summary: Regenerar QR de mesa
       tags:
       - tables
+  /api/v1/admin/users:
+    get:
+      description: Superadmin ve todos los usuarios; owner ve solo los employees de
+        su restaurante.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.AdminUserResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Listar usuarios administradores
+      tags:
+      - admin
+    post:
+      consumes:
+      - application/json
+      description: Crea un nuevo usuario owner o employee. Superadmin puede crear
+        cualquier rol; owner solo puede crear employees de su restaurante.
+      parameters:
+      - description: Datos del nuevo usuario
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateAdminUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.AdminUserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Crear usuario administrador
+      tags:
+      - admin
+  /api/v1/admin/users/{id}:
+    delete:
+      description: Superadmin puede eliminar cualquier usuario; owner solo puede eliminar
+        employees de su restaurante.
+      parameters:
+      - description: ID del usuario
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Eliminar usuario administrador
+      tags:
+      - admin
   /api/v1/feedback:
     post:
       consumes:
@@ -290,6 +406,8 @@ paths:
           description: Too Many Requests
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - SessionToken: []
       summary: Crear solicitud
       tags:
       - requests
@@ -323,10 +441,32 @@ paths:
           description: Unprocessable Entity
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
       summary: Actualizar estado de solicitud
       tags:
       - requests
   /api/v1/restaurants:
+    get:
+      description: Retorna todos los restaurantes del sistema (solo superadmin)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.RestaurantResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Listar todos los restaurantes
+      tags:
+      - restaurants
     post:
       consumes:
       - application/json
@@ -353,6 +493,8 @@ paths:
           description: Unprocessable Entity
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
       summary: Crear restaurante
       tags:
       - restaurants
@@ -376,6 +518,8 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
       summary: Obtener restaurante
       tags:
       - restaurants
@@ -401,6 +545,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
       summary: Obtener solicitudes activas
       tags:
       - requests
@@ -426,6 +572,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
       summary: Listar mesas
       tags:
       - tables
@@ -464,6 +612,8 @@ paths:
           description: Unprocessable Entity
           schema:
             $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
       summary: Crear mesa
       tags:
       - tables
@@ -566,4 +716,15 @@ paths:
       summary: Conectar al WebSocket del restaurante
       tags:
       - websocket
+securityDefinitions:
+  AdminToken:
+    description: 'JWT de administrador. Formato: "Bearer <token>"'
+    in: header
+    name: Authorization
+    type: apiKey
+  SessionToken:
+    description: 'JWT de sesión de cliente (QR). Formato: "Bearer <token>"'
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

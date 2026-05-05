@@ -279,10 +279,14 @@ func (m *Notifier) Notify(restaurantID string, event any) {
 // --- AdminRepository Mock ---
 
 type AdminRepo struct {
-	Admins           map[string]*entity.AdminUser
-	FindByUsernameFn func(username string) (*entity.AdminUser, error)
-	CreateFn         func(admin *entity.AdminUser) error
-	ExistsAnyFn      func() (bool, error)
+	Admins             map[string]*entity.AdminUser
+	FindByUsernameFn   func(username string) (*entity.AdminUser, error)
+	FindByIDFn         func(id string) (*entity.AdminUser, error)
+	FindByRestaurantFn func(restaurantID string) ([]entity.AdminUser, error)
+	FindAllFn          func() ([]entity.AdminUser, error)
+	CreateFn           func(admin *entity.AdminUser) error
+	ExistsAnyFn        func() (bool, error)
+	DeleteByIDFn       func(id string) error
 }
 
 func NewAdminRepo() *AdminRepo {
@@ -301,6 +305,41 @@ func (m *AdminRepo) FindByUsername(username string) (*entity.AdminUser, error) {
 	return nil, fmt.Errorf("admin not found")
 }
 
+func (m *AdminRepo) FindByID(id string) (*entity.AdminUser, error) {
+	if m.FindByIDFn != nil {
+		return m.FindByIDFn(id)
+	}
+	a, ok := m.Admins[id]
+	if !ok {
+		return nil, fmt.Errorf("admin not found")
+	}
+	return a, nil
+}
+
+func (m *AdminRepo) FindByRestaurantID(restaurantID string) ([]entity.AdminUser, error) {
+	if m.FindByRestaurantFn != nil {
+		return m.FindByRestaurantFn(restaurantID)
+	}
+	var list []entity.AdminUser
+	for _, a := range m.Admins {
+		if a.RestaurantID != nil && *a.RestaurantID == restaurantID {
+			list = append(list, *a)
+		}
+	}
+	return list, nil
+}
+
+func (m *AdminRepo) FindAll() ([]entity.AdminUser, error) {
+	if m.FindAllFn != nil {
+		return m.FindAllFn()
+	}
+	var list []entity.AdminUser
+	for _, a := range m.Admins {
+		list = append(list, *a)
+	}
+	return list, nil
+}
+
 func (m *AdminRepo) Create(admin *entity.AdminUser) error {
 	if m.CreateFn != nil {
 		return m.CreateFn(admin)
@@ -314,4 +353,12 @@ func (m *AdminRepo) ExistsAny() (bool, error) {
 		return m.ExistsAnyFn()
 	}
 	return len(m.Admins) > 0, nil
+}
+
+func (m *AdminRepo) DeleteByID(id string) error {
+	if m.DeleteByIDFn != nil {
+		return m.DeleteByIDFn(id)
+	}
+	delete(m.Admins, id)
+	return nil
 }

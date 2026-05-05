@@ -1,252 +1,285 @@
-# Sistema de Llamado de Mozos — Arquitectura DDD (Go + Next.js)
+# Sistema de Llamado de Mozos
 
-## 🧠 Contexto del dominio
-
-Sistema para restaurantes donde:
-
-- Cada mesa tiene un QR
-- El cliente accede a una web app
-- Puede llamar al mozo, pedir la cuenta o hacer consultas
-- El restaurante recibe solicitudes en tiempo real
-- Se registran métricas y feedback
+Sistema para restaurantes donde cada mesa tiene un código QR. El cliente escanea el QR, obtiene un JWT de sesión y puede llamar al mozo, pedir la cuenta o dejar feedback. El panel de administración recibe solicitudes en tiempo real vía WebSocket.
 
 ---
 
-## 🧱 Enfoque arquitectónico
+## Arquitectura
 
-Estilo: **DDD (Domain-Driven Design)** + **Clean Architecture**
+Estilo: **Clean Architecture / DDD**
 
 ```
-/domain        → reglas de negocio puras
-/application   → casos de uso
-/infrastructure→ DB, WebSockets, APIs
-/interfaces    → HTTP handlers / controllers
+domain/entity          → structs de dominio (sin lógica)
+domain/repository      → interfaces de repositorio
+application/usecase    → lógica de negocio
+interfaces/http        → Gin handlers, DTOs, middleware
+infrastructure/        → GORM/PostgreSQL, JWT, WebSocket hub
+cmd/server/main.go     → wiring completo
 ```
+
+**Stack:** Go 1.25 · Gin · GORM/PostgreSQL · JWT HS256 · Zap · Swagger
 
 ---
 
-## 🧩 Dominio
+## Dominio
 
-### Restaurant
+### Entidades
 
-```go
-type Restaurant struct {
-    ID   string
-    Name string
-    Plan string
-}
+| Entidad      | Campos clave                                                          |
+| ------------ | --------------------------------------------------------------------- |
+| `Restaurant` | `id`, `name`, `plan`                                                  |
+| `Table`      | `id`, `number`, `restaurant_id`, `qr_code`                            |
+| `Request`    | `id`, `table_id`, `type`, `status`, `created_at`                      |
+| `Feedback`   | `id`, `table_id`, `score` (1–5), `comment`, `created_at`              |
+| `AdminUser`  | `id`, `username`, `password_hash`, `role`, `restaurant_id` (nullable) |
+
+### Tipos
+
 ```
-
-### Table
-
-```go
-type Table struct {
-    ID           string
-    Number       int
-    RestaurantID string
-    QRCode       string
-}
-```
-
-### Request
-
-```go
-type RequestType string
-
-const (
-    CallWaiter RequestType = "CALL_WAITER"
-    AskBill    RequestType = "ASK_BILL"
-    AskHelp    RequestType = "ASK_HELP"
-)
-
-type RequestStatus string
-
-const (
-    Pending   RequestStatus = "PENDING"
-    InProcess RequestStatus = "IN_PROCESS"
-    Done      RequestStatus = "DONE"
-)
-
-type Request struct {
-    ID        string
-    TableID   string
-    Type      RequestType
-    Status    RequestStatus
-    CreatedAt time.Time
-}
-```
-
-### Feedback
-
-```go
-type Feedback struct {
-    ID        string
-    TableID   string
-    Score     int
-    CreatedAt time.Time
-}
+RequestType:   CALL_WAITER | ASK_BILL | ASK_HELP
+RequestStatus: PENDING | IN_PROCESS | DONE
+AdminRole:     superadmin | owner | employee
 ```
 
 ---
 
-## ⚙️ Application Layer
+## Auth — dos tokens independientes
 
-### Casos de uso
-
-- Crear solicitud
-- Marcar como atendida
-- Obtener solicitudes activas
-- Registrar feedback
-
----
-
-## 🏗 Infrastructure
-
-- Base de datos: MySQL / PostgreSQL
-- WebSockets (recomendado)
-- Generación de QR dinámicos
+|                       | Cliente (sesión QR)                         | Admin                                 |
+| --------------------- | ------------------------------------------- | ------------------------------------- |
+| Endpoint de obtención | `POST /session`                             | `POST /admin/login`                   |
+| Secret env var        | `SESSION_SECRET`                            | `ADMIN_SECRET`                        |
+| Duración              | 30 min                                      | 24 h                                  |
+| Header                | `Authorization: Bearer <session_token>`     | `Authorization: Bearer <admin_token>` |
+| Claims                | `table_id`, `restaurant_id`, `table_number` | `admin_id`, `restaurant_id`, `role`   |
 
 ---
 
-## 🌐 Interfaces
+## RBAC — roles de administrador
 
-### Cliente
+| Rol          | `restaurant_id` | Acceso                             |
+| ------------ | --------------- | ---------------------------------- |
+| `superadmin` | `null`          | Todo el sistema                    |
+| `owner`      | requerido       | Solo su restaurante                |
+| `employee`   | requerido       | Rutas operativas de su restaurante |
 
-- POST /requests
-- GET /table/{id}/status
-- POST /feedback
+### Tabla de rutas por rol
 
-### Restaurante
-
-- GET /requests/active
-- PATCH /requests/{id}/complete
-
----
-
-## 🖥 Frontend (Next.js)
-
-### Cliente (vista de mesa — app del QR)
-
-- Escanea QR → obtiene `qr_code` → llama a `POST /api/v1/session`
-- Guarda `session_token` en memoria/sessionStorage
-- Usa el token en `Authorization: Bearer <token>` para llamar a `POST /api/v1/requests`
-- El token dura **30 minutos** — si expira (401), redirigir al QR
-
-### Dashboard (panel del restaurante)
-
-- Lista de mesas activas y sus solicitudes
-- Conecta WebSocket por restaurante para recibir eventos en tiempo real
-- Botón para marcar solicitudes como atendidas
+| Método   | Ruta                                         | Roles permitidos                                        |
+| -------- | -------------------------------------------- | ------------------------------------------------------- |
+| `POST`   | `/admin/login`                               | público                                                 |
+| `GET`    | `/restaurants`                               | superadmin                                              |
+| `POST`   | `/restaurants`                               | superadmin                                              |
+| `GET`    | `/restaurants/:restaurantId`                 | superadmin, owner (propio)                              |
+| `POST`   | `/restaurants/:restaurantId/tables`          | superadmin, owner (propio)                              |
+| `GET`    | `/restaurants/:restaurantId/tables`          | superadmin, owner (propio)                              |
+| `POST`   | `/admin/tables/:id/regenerate-qr`            | superadmin, owner (propio)                              |
+| `GET`    | `/restaurants/:restaurantId/requests/active` | superadmin, owner, employee (propio)                    |
+| `PATCH`  | `/requests/:requestId`                       | superadmin, owner, employee                             |
+| `POST`   | `/admin/users`                               | superadmin, owner (solo employees propios)              |
+| `GET`    | `/admin/users`                               | superadmin (todos), owner (propios)                     |
+| `DELETE` | `/admin/users/:id`                           | superadmin (cualquiera), owner (solo employees propios) |
 
 ---
 
-## 🔌 API Reference
+## API Reference
 
-**Base URL:** `http://localhost:8080/api/v1`
+**Base URL:** `http://localhost:8080/api/v1`  
+**Swagger UI:** `http://localhost:8080/swagger/index.html`
 
-### Autenticación de cliente (QR → JWT)
+---
 
-```
-POST /session
-Content-Type: application/json
+### Rutas públicas
 
+#### `POST /session` — Iniciar sesión con QR
+
+```json
+// Request
 { "qr_code": "ABC12345XY" }
+
+// Response 200
+{ "session_token": "<jwt>", "table": { "number": 3 } }
 ```
 
-Respuesta `200`:
-
-```json
-{
-  "session_token": "<jwt>",
-  "table": { "number": 3 }
-}
-```
-
-Errores:
-
-- `400` — qr_code vacío
-- `404` — QR no existe
-- `403` — mesa inactiva
+Errores: `400` qr_code vacío · `404` QR no existe
 
 ---
 
-### Crear solicitud (cliente autenticado)
+#### `GET /tables/:tableId/status` — Estado de mesa
 
+Retorna solicitudes activas de la mesa. No requiere auth.
+
+---
+
+#### `POST /feedback` — Registrar feedback
+
+```json
+// Request
+{ "table_id": "uuid", "score": 5, "comment": "Excelente" }
+
+// Response 201
+{ "id": "uuid", "table_id": "uuid", "score": 5, "comment": "Excelente", "created_at": "..." }
 ```
-POST /requests
-Authorization: Bearer <session_token>
-Content-Type: application/json
 
+Errores: `400` · `422`
+
+---
+
+### Rutas de cliente (requieren `session_token`)
+
+#### `POST /requests` — Crear solicitud
+
+```json
+// Request
 { "type": "CALL_WAITER" }
+
+// Response 201
+{ "id": "uuid", "table_id": "uuid", "type": "CALL_WAITER", "status": "PENDING", "created_at": "..." }
 ```
 
-Tipos válidos: `CALL_WAITER` | `ASK_BILL` | `ASK_HELP`
+Tipos válidos: `CALL_WAITER` | `ASK_BILL` | `ASK_HELP`  
+Errores: `401` · `400` tipo inválido · `429` cooldown (header `Retry-After: <seg>`)
 
-Respuesta `201`:
+---
+
+### Rutas de admin (requieren `admin_token`)
+
+#### `POST /admin/login`
 
 ```json
-{
-  "id": "uuid",
-  "table_id": "uuid",
-  "type": "CALL_WAITER",
-  "status": "PENDING",
-  "created_at": "2026-04-28T10:00:00Z"
-}
+// Request
+{ "username": "admin", "password": "secret" }
+
+// Response 200
+{ "token": "<jwt>" }
 ```
 
-Errores:
-
-- `401` — sin token o expirado
-- `400` — tipo inválido
-- `429` — cooldown activo (header `Retry-After: <segundos>`)
+Errores: `400` · `401`
 
 ---
 
-### Obtener solicitudes activas (panel)
+#### `GET /restaurants` — Listar restaurantes _(superadmin)_
 
-```
-GET /restaurants/:restaurantId/requests/active
-```
-
-Respuesta `200`: array de `RequestResponse`
+Respuesta `200`: array de `RestaurantResponse`
 
 ---
 
-### Marcar solicitud como atendida (panel)
+#### `POST /restaurants` — Crear restaurante _(superadmin)_
 
+```json
+// Request
+{ "name": "La Trattoria", "plan": "pro" }
+
+// Response 201
+{ "id": "uuid", "name": "La Trattoria", "plan": "pro" }
 ```
-PATCH /requests/:requestId
-Content-Type: application/json
 
+---
+
+#### `GET /restaurants/:restaurantId` — Obtener restaurante _(superadmin, owner)_
+
+---
+
+#### `POST /restaurants/:restaurantId/tables` — Crear mesa _(superadmin, owner)_
+
+```json
+// Request
+{ "number": 5 }
+
+// Response 201
+{ "id": "uuid", "number": 5, "restaurant_id": "uuid", "qr_code": "XXXX" }
+```
+
+Errores: `409` número duplicado · `422`
+
+---
+
+#### `GET /restaurants/:restaurantId/tables` — Listar mesas _(superadmin, owner)_
+
+---
+
+#### `POST /admin/tables/:id/regenerate-qr` — Regenerar QR _(superadmin, owner)_
+
+```json
+// Response 200
+{ "qr_code": "NUEVOCOD" }
+```
+
+---
+
+#### `GET /restaurants/:restaurantId/requests/active` — Solicitudes activas _(superadmin, owner, employee)_
+
+---
+
+#### `PATCH /requests/:requestId` — Actualizar estado _(cualquier admin)_
+
+```json
+// Request
 { "status": "DONE" }
-```
 
-Respuesta `200` o `422`
-
----
-
-### Estado de solicitudes de una mesa
-
-```
-GET /tables/:tableId/status
+// Response 204
 ```
 
 ---
 
-### Feedback del cliente
+#### `POST /admin/users` — Crear usuario admin _(superadmin, owner)_
 
-```
-POST /feedback
-Content-Type: application/json
+```json
+// Request
+{ "username": "juan", "password": "secret", "role": "employee", "restaurant_id": "uuid" }
 
-{
-  "table_id": "uuid",
-  "score": 5,
-  "comment": "Excelente servicio"
-}
+// Response 201
+{ "id": "uuid", "username": "juan", "role": "employee", "restaurant_id": "uuid", "created_at": "..." }
 ```
 
-Score: 1–5. Respuesta `201`.
+Reglas: superadmin puede crear cualquier rol; owner solo puede crear `employee` de su propio restaurante.  
+Errores: `400` · `403` · `422` username duplicado
+
+---
+
+#### `GET /admin/users` — Listar usuarios admin _(superadmin, owner)_
+
+Superadmin ve todos; owner ve solo los de su restaurante.
+
+---
+
+#### `DELETE /admin/users/:id` — Eliminar usuario admin _(superadmin, owner)_
+
+Superadmin puede eliminar cualquiera; owner solo puede eliminar employees de su restaurante.  
+Respuesta `204`. Errores: `403` · `404`
+
+---
+
+### WebSocket
+
+#### `GET /ws/:restaurantId`
+
+Acepta `?token=<jwt>` — válido con session token o admin token cuyo `restaurant_id` coincida.  
+Emite eventos en tiempo real cuando se crean o actualizan solicitudes.
+
+---
+
+## Seed inicial
+
+Al arrancar, si no existe ningún admin, el sistema crea automáticamente un `superadmin` y loguea las credenciales:
+
+```
+INFO  superadmin created — change this password immediately
+      username: admin
+      password: <generado>
+```
+
+---
+
+## Variables de entorno
+
+| Variable          | Descripción                                | Default     |
+| ----------------- | ------------------------------------------ | ----------- |
+| `DATABASE_URL`    | PostgreSQL DSN                             | —           |
+| `SESSION_SECRET`  | Secret HMAC para tokens de cliente         | —           |
+| `ADMIN_SECRET`    | Secret HMAC para tokens de admin           | —           |
+| `ALLOWED_ORIGINS` | Orígenes permitidos CORS (comma-separated) | acepta todo |
+| `PORT`            | Puerto del servidor                        | `8080`      |
 
 ---
 

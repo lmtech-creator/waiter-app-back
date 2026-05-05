@@ -42,6 +42,7 @@ func VerifySession(tokenStr string, secret []byte) (*SessionClaims, error) {
 type AdminClaims struct {
 	AdminID      string `json:"admin_id"`
 	RestaurantID string `json:"restaurant_id"`
+	Role         string `json:"role"`
 	jwt.RegisteredClaims
 }
 

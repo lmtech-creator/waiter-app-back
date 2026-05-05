@@ -34,6 +34,7 @@ func makeAdminWSToken(restaurantID string, expOffset time.Duration) string {
 	claims := auth.AdminClaims{
 		AdminID:      "admin-1",
 		RestaurantID: restaurantID,
+		Role:         "owner",
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expOffset)),
 		},
