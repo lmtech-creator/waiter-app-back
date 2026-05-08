@@ -617,6 +617,84 @@ paths:
       summary: Crear mesa
       tags:
       - tables
+  /api/v1/restaurants/{restaurantId}/tables/{id}/activate:
+    post:
+      description: Marca una mesa como activa para habilitar nuevas sesiones QR
+      parameters:
+      - description: ID del restaurante
+        in: path
+        name: restaurantId
+        required: true
+        type: string
+      - description: ID de la mesa
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Activar mesa
+      tags:
+      - tables
+  /api/v1/restaurants/{restaurantId}/tables/{id}/inactivate:
+    post:
+      description: Marca una mesa como inactiva para bloquear nuevas sesiones QR
+      parameters:
+      - description: ID del restaurante
+        in: path
+        name: restaurantId
+        required: true
+        type: string
+      - description: ID de la mesa
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Inactivar mesa
+      tags:
+      - tables
   /api/v1/session:
     post:
       consumes:

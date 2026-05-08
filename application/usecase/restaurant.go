@@ -11,6 +11,8 @@ import (
 )
 
 var ErrTableNumberExists = errors.New("table number already exists for this restaurant")
+var ErrTableNotFound = errors.New("table not found")
+var ErrTableRestaurantMismatch = errors.New("table does not belong to restaurant")
 
 const qrAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
@@ -119,4 +121,32 @@ func (uc *RestaurantUseCase) RegenerateQR(tableID string) (string, error) {
 	}
 
 	return newCode, nil
+}
+
+func (uc *RestaurantUseCase) InactivateTable(restaurantID, tableID string) error {
+	t, err := uc.tableRepo.FindByID(tableID)
+	if err != nil {
+		return ErrTableNotFound
+	}
+	if t.RestaurantID != restaurantID {
+		return ErrTableRestaurantMismatch
+	}
+	if err := uc.tableRepo.InactiveTable(tableID); err != nil {
+		return fmt.Errorf("failed to inactivate table: %w", err)
+	}
+	return nil
+}
+
+func (uc *RestaurantUseCase) ActivateTable(restaurantID, tableID string) error {
+	t, err := uc.tableRepo.FindByID(tableID)
+	if err != nil {
+		return ErrTableNotFound
+	}
+	if t.RestaurantID != restaurantID {
+		return ErrTableRestaurantMismatch
+	}
+	if err := uc.tableRepo.ReactiVateTable(tableID); err != nil {
+		return fmt.Errorf("failed to activate table: %w", err)
+	}
+	return nil
 }

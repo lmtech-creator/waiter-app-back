@@ -59,6 +59,8 @@ type TableRepo struct {
 	FindByNumberAndRestaurantFn func(number int, restaurantID string) (*entity.Table, error)
 	FindByQRCodeFn              func(qrCode string) (*entity.Table, error)
 	UpdateQRCodeFn              func(id, qrCode string) error
+	InactiveTableFn             func(id string) error
+	ReactiVateTableFn           func(id string) error
 }
 
 func NewTableRepo() *TableRepo {
@@ -130,6 +132,34 @@ func (m *TableRepo) UpdateQRCode(id, qrCode string) error {
 		return fmt.Errorf("table not found")
 	}
 	t.QRCode = qrCode
+	return nil
+}
+
+func (m *TableRepo) InactiveTable(id string) error {
+	if m.InactiveTableFn != nil {
+		return m.InactiveTableFn(id)
+	}
+
+	t, ok := m.Tables[id]
+	if !ok {
+		return fmt.Errorf("table not found")
+	}
+
+	t.IsActive = false
+	return nil
+}
+
+func (m *TableRepo) ReactiVateTable(id string) error {
+	if m.ReactiVateTableFn != nil {
+		return m.ReactiVateTableFn(id)
+	}
+
+	t, ok := m.Tables[id]
+	if !ok {
+		return fmt.Errorf("table not found")
+	}
+
+	t.IsActive = true
 	return nil
 }
 

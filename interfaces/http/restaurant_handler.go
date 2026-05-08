@@ -183,3 +183,69 @@ func (h *RestaurantHandler) RegenerateQR(c *gin.Context) {
 	zap.L().Info("qr regenerated", zap.String("table_id", tableID))
 	c.JSON(http.StatusOK, gin.H{"qr_code": newCode})
 }
+
+// InactivateTable godoc
+// @Summary      Inactivar mesa
+// @Description  Marca una mesa como inactiva para bloquear nuevas sesiones QR
+// @Tags         tables
+// @Produce      json
+// @Param        restaurantId  path      string  true  "ID del restaurante"
+// @Param        id            path      string  true  "ID de la mesa"
+// @Success      200           {object}  map[string]any
+// @Failure      403           {object}  dto.ErrorResponse
+// @Failure      404           {object}  dto.ErrorResponse
+// @Failure      500           {object}  dto.ErrorResponse
+// @Security     AdminToken
+// @Router       /api/v1/restaurants/{restaurantId}/tables/{id}/inactivate [post]
+func (h *RestaurantHandler) InactivateTable(c *gin.Context) {
+	restaurantID := c.Param("restaurantId")
+	tableID := c.Param("id")
+
+	err := h.uc.InactivateTable(restaurantID, tableID)
+	if err != nil {
+		switch {
+		case errors.Is(err, usecase.ErrTableNotFound):
+			c.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "not_found", Message: "Mesa no encontrada."})
+		case errors.Is(err, usecase.ErrTableRestaurantMismatch):
+			c.JSON(http.StatusForbidden, dto.ErrorResponse{Error: "forbidden", Message: "La mesa no pertenece al restaurante."})
+		default:
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "internal_error", Message: "No se pudo inactivar la mesa."})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"table_id": tableID, "is_active": false})
+}
+
+// ActivateTable godoc
+// @Summary      Activar mesa
+// @Description  Marca una mesa como activa para habilitar nuevas sesiones QR
+// @Tags         tables
+// @Produce      json
+// @Param        restaurantId  path      string  true  "ID del restaurante"
+// @Param        id            path      string  true  "ID de la mesa"
+// @Success      200           {object}  map[string]any
+// @Failure      403           {object}  dto.ErrorResponse
+// @Failure      404           {object}  dto.ErrorResponse
+// @Failure      500           {object}  dto.ErrorResponse
+// @Security     AdminToken
+// @Router       /api/v1/restaurants/{restaurantId}/tables/{id}/activate [post]
+func (h *RestaurantHandler) ActivateTable(c *gin.Context) {
+	restaurantID := c.Param("restaurantId")
+	tableID := c.Param("id")
+
+	err := h.uc.ActivateTable(restaurantID, tableID)
+	if err != nil {
+		switch {
+		case errors.Is(err, usecase.ErrTableNotFound):
+			c.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "not_found", Message: "Mesa no encontrada."})
+		case errors.Is(err, usecase.ErrTableRestaurantMismatch):
+			c.JSON(http.StatusForbidden, dto.ErrorResponse{Error: "forbidden", Message: "La mesa no pertenece al restaurante."})
+		default:
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "internal_error", Message: "No se pudo activar la mesa."})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"table_id": tableID, "is_active": true})
+}

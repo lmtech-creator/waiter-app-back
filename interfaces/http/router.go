@@ -89,6 +89,8 @@ func SetupRouter(
 			ownerOrAbove.GET("/restaurants/:restaurantId", restaurantHandler.Get)
 			ownerOrAbove.POST("/restaurants/:restaurantId/tables", restaurantHandler.CreateTable)
 			ownerOrAbove.GET("/restaurants/:restaurantId/tables", restaurantHandler.GetTables)
+			ownerOrAbove.POST("/restaurants/:restaurantId/tables/:id/inactivate", restaurantHandler.InactivateTable)
+			ownerOrAbove.POST("/restaurants/:restaurantId/tables/:id/activate", restaurantHandler.ActivateTable)
 			ownerOrAbove.POST("/admin/tables/:id/regenerate-qr", restaurantHandler.RegenerateQR)
 		}
 

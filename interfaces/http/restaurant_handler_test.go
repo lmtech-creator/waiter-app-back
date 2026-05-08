@@ -274,3 +274,72 @@ func TestRestaurantHandler_RegenerateQR_UpdateError(t *testing.T) {
 		t.Errorf("expected 500, got %d", w.Code)
 	}
 }
+
+func TestRestaurantHandler_InactivateTable_Success(t *testing.T) {
+	handler, _, tableRepo := setupRestaurantRouter()
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1", IsActive: true}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/restaurants/r1/tables/t1/inactivate", nil)
+	c.Params = gin.Params{{Key: "restaurantId", Value: "r1"}, {Key: "id", Value: "t1"}}
+
+	handler.InactivateTable(c)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+	if tableRepo.Tables["t1"].IsActive {
+		t.Error("expected table to be inactive")
+	}
+}
+
+func TestRestaurantHandler_InactivateTable_NotFound(t *testing.T) {
+	handler, _, _ := setupRestaurantRouter()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/restaurants/r1/tables/missing/inactivate", nil)
+	c.Params = gin.Params{{Key: "restaurantId", Value: "r1"}, {Key: "id", Value: "missing"}}
+
+	handler.InactivateTable(c)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestRestaurantHandler_ActivateTable_Success(t *testing.T) {
+	handler, _, tableRepo := setupRestaurantRouter()
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1", IsActive: false}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/restaurants/r1/tables/t1/activate", nil)
+	c.Params = gin.Params{{Key: "restaurantId", Value: "r1"}, {Key: "id", Value: "t1"}}
+
+	handler.ActivateTable(c)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+	if !tableRepo.Tables["t1"].IsActive {
+		t.Error("expected table to be active")
+	}
+}
+
+func TestRestaurantHandler_ActivateTable_Mismatch(t *testing.T) {
+	handler, _, tableRepo := setupRestaurantRouter()
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r2", IsActive: false}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/restaurants/r1/tables/t1/activate", nil)
+	c.Params = gin.Params{{Key: "restaurantId", Value: "r1"}, {Key: "id", Value: "t1"}}
+
+	handler.ActivateTable(c)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("expected 403, got %d", w.Code)
+	}
+}

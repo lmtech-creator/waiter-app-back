@@ -14,6 +14,8 @@ type TableRepository interface {
 	FindByRestaurantID(restaurantID string) ([]entity.Table, error)
 	FindByNumberAndRestaurantID(number int, restaurantID string) (*entity.Table, error)
 	FindByQRCode(qrCode string) (*entity.Table, error)
+	InactiveTable(id string) error
+	ReactiVateTable(id string) error
 	UpdateQRCode(id, qrCode string) error
 }
 

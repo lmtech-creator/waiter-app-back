@@ -52,3 +52,11 @@ func (r *TableRepo) FindByQRCode(qrCode string) (*entity.Table, error) {
 func (r *TableRepo) UpdateQRCode(id, qrCode string) error {
 	return r.db.Model(&entity.Table{}).Where("id = ?", id).Update("qr_code", qrCode).Error
 }
+
+func (r *TableRepo) InactiveTable(id string) error {
+	return r.db.Model(&entity.Table{}).Where("id = ?", id).Update("is_active", false).Error
+}
+
+func (r *TableRepo) ReactiVateTable(id string) error {
+	return r.db.Model(&entity.Table{}).Where("id = ?", id).Update("is_active", true).Error
+}

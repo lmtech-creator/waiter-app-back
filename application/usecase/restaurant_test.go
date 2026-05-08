@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -227,5 +228,73 @@ func TestRegenerateQR_UpdateError(t *testing.T) {
 	_, err := uc.RegenerateQR("t1")
 	if err == nil {
 		t.Fatal("expected error from update failure")
+	}
+}
+
+func TestInactivateTable_Success(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1", IsActive: true}
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	err := uc.InactivateTable("r1", "t1")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if tableRepo.Tables["t1"].IsActive {
+		t.Fatal("expected table to be inactive")
+	}
+}
+
+func TestInactivateTable_NotFound(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	err := uc.InactivateTable("r1", "missing")
+	if !errors.Is(err, ErrTableNotFound) {
+		t.Fatalf("expected ErrTableNotFound, got %v", err)
+	}
+}
+
+func TestInactivateTable_RestaurantMismatch(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r2", IsActive: true}
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	err := uc.InactivateTable("r1", "t1")
+	if !errors.Is(err, ErrTableRestaurantMismatch) {
+		t.Fatalf("expected ErrTableRestaurantMismatch, got %v", err)
+	}
+}
+
+func TestActivateTable_Success(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1", IsActive: false}
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	err := uc.ActivateTable("r1", "t1")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if !tableRepo.Tables["t1"].IsActive {
+		t.Fatal("expected table to be active")
+	}
+}
+
+func TestActivateTable_RepoError(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1", IsActive: false}
+	tableRepo.ReactiVateTableFn = func(id string) error {
+		return fmt.Errorf("db error")
+	}
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	err := uc.ActivateTable("r1", "t1")
+	if err == nil {
+		t.Fatal("expected error")
 	}
 }
