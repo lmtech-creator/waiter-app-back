@@ -13,6 +13,8 @@ import (
 var ErrTableNumberExists = errors.New("table number already exists for this restaurant")
 var ErrTableNotFound = errors.New("table not found")
 var ErrTableRestaurantMismatch = errors.New("table does not belong to restaurant")
+var ErrInvalidQRBannerText = errors.New("qr_banner_text must be 1-100 characters")
+var ErrInvalidQRFooterItems = errors.New("qr_footer_items must have 1-5 items, each 1-50 characters")
 
 const qrAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
@@ -37,8 +39,10 @@ func NewRestaurantUseCase(rr repository.RestaurantRepository, tr repository.Tabl
 }
 
 type CreateRestaurantInput struct {
-	Name string `json:"name" binding:"required"`
-	Plan string `json:"plan"`
+	Name          string   `json:"name" binding:"required"`
+	Plan          string   `json:"plan"`
+	QrBannerText  string   `json:"qr_banner_text"`
+	QrFooterItems []string `json:"qr_footer_items"`
 }
 
 func (uc *RestaurantUseCase) CreateRestaurant(input CreateRestaurantInput) (*entity.Restaurant, error) {
@@ -47,10 +51,28 @@ func (uc *RestaurantUseCase) CreateRestaurant(input CreateRestaurantInput) (*ent
 		plan = "free"
 	}
 
+	bannerText := input.QrBannerText
+	if bannerText == "" {
+		bannerText = "Escaneá y llamá al mozo"
+	}
+	if len(bannerText) > 100 {
+		return nil, ErrInvalidQRBannerText
+	}
+
+	footerItems := input.QrFooterItems
+	if footerItems == nil {
+		footerItems = []string{"Llamar al mozo", "Pedir la cuenta", "Dejar reseña"}
+	}
+	if err := validateFooterItems(footerItems); err != nil {
+		return nil, err
+	}
+
 	r := &entity.Restaurant{
-		ID:   uuid.New().String(),
-		Name: input.Name,
-		Plan: plan,
+		ID:            uuid.New().String(),
+		Name:          input.Name,
+		Plan:          plan,
+		QrBannerText:  bannerText,
+		QrFooterItems: entity.JSONB(footerItems),
 	}
 
 	if err := uc.restaurantRepo.Create(r); err != nil {
@@ -58,6 +80,18 @@ func (uc *RestaurantUseCase) CreateRestaurant(input CreateRestaurantInput) (*ent
 	}
 
 	return r, nil
+}
+
+func validateFooterItems(items []string) error {
+	if len(items) < 1 || len(items) > 5 {
+		return ErrInvalidQRFooterItems
+	}
+	for _, item := range items {
+		if len(item) < 1 || len(item) > 50 {
+			return ErrInvalidQRFooterItems
+		}
+	}
+	return nil
 }
 
 func (uc *RestaurantUseCase) GetRestaurant(id string) (*entity.Restaurant, error) {

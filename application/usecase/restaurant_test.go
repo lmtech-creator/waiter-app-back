@@ -43,6 +43,89 @@ func TestCreateRestaurant_WithPlan(t *testing.T) {
 	}
 }
 
+func TestCreateRestaurant_QRDefaults(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	r, err := uc.CreateRestaurant(CreateRestaurantInput{Name: "Test"})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if r.QrBannerText != "Escaneá y llamá al mozo" {
+		t.Errorf("expected default banner, got %q", r.QrBannerText)
+	}
+	if len(r.QrFooterItems) != 3 {
+		t.Fatalf("expected 3 default footer items, got %d", len(r.QrFooterItems))
+	}
+	if r.QrFooterItems[0] != "Llamar al mozo" {
+		t.Errorf("expected first footer item 'Llamar al mozo', got %q", r.QrFooterItems[0])
+	}
+}
+
+func TestCreateRestaurant_WithCustomQRFields(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	r, err := uc.CreateRestaurant(CreateRestaurantInput{
+		Name:          "Custom",
+		QrBannerText:  "Bienvenido!",
+		QrFooterItems: []string{"Llamar", "Reseña"},
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if r.QrBannerText != "Bienvenido!" {
+		t.Errorf("expected 'Bienvenido!', got %q", r.QrBannerText)
+	}
+	if len(r.QrFooterItems) != 2 {
+		t.Fatalf("expected 2 footer items, got %d", len(r.QrFooterItems))
+	}
+}
+
+func TestCreateRestaurant_InvalidQRBannerText_TooLong(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	_, err := uc.CreateRestaurant(CreateRestaurantInput{
+		Name:         "Test",
+		QrBannerText: string(make([]byte, 101)),
+	})
+	if !errors.Is(err, ErrInvalidQRBannerText) {
+		t.Fatalf("expected ErrInvalidQRBannerText, got %v", err)
+	}
+}
+
+func TestCreateRestaurant_InvalidQRFooterItems_TooMany(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	_, err := uc.CreateRestaurant(CreateRestaurantInput{
+		Name:          "Test",
+		QrFooterItems: []string{"a", "b", "c", "d", "e", "f"},
+	})
+	if !errors.Is(err, ErrInvalidQRFooterItems) {
+		t.Fatalf("expected ErrInvalidQRFooterItems, got %v", err)
+	}
+}
+
+func TestCreateRestaurant_InvalidQRFooterItems_ItemTooLong(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	_, err := uc.CreateRestaurant(CreateRestaurantInput{
+		Name:          "Test",
+		QrFooterItems: []string{string(make([]byte, 51))},
+	})
+	if !errors.Is(err, ErrInvalidQRFooterItems) {
+		t.Fatalf("expected ErrInvalidQRFooterItems, got %v", err)
+	}
+}
+
 func TestCreateRestaurant_RepoError(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	restaurantRepo.CreateFn = func(r *entity.Restaurant) error {

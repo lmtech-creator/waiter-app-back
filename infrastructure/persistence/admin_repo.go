@@ -57,6 +57,10 @@ func (r *AdminRepo) ExistsAny() (bool, error) {
 	return count > 0, nil
 }
 
+func (r *AdminRepo) Update(admin *entity.AdminUser) error {
+	return r.db.Save(admin).Error
+}
+
 func (r *AdminRepo) DeleteByID(id string) error {
 	return r.db.Delete(&entity.AdminUser{}, "id = ?", id).Error
 }

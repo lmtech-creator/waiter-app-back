@@ -27,8 +27,8 @@ cmd/server/main.go     → wiring completo
 
 | Entidad      | Campos clave                                                          |
 | ------------ | --------------------------------------------------------------------- |
-| `Restaurant` | `id`, `name`, `plan`                                                  |
-| `Table`      | `id`, `number`, `restaurant_id`, `qr_code`                            |
+| `Restaurant` | `id`, `name`, `plan`, `qr_banner_text`, `qr_footer_items`              |
+| `Table`      | `id`, `number`, `restaurant_id`, `qr_code`, `is_active`               |
 | `Request`    | `id`, `table_id`, `type`, `status`, `created_at`                      |
 | `Feedback`   | `id`, `table_id`, `score` (1–5), `comment`, `created_at`              |
 | `AdminUser`  | `id`, `username`, `password_hash`, `role`, `restaurant_id` (nullable) |
@@ -74,6 +74,8 @@ AdminRole:     superadmin | owner | employee
 | `POST`   | `/restaurants/:restaurantId/tables`          | superadmin, owner (propio)                              |
 | `GET`    | `/restaurants/:restaurantId/tables`          | superadmin, owner (propio)                              |
 | `POST`   | `/admin/tables/:id/regenerate-qr`            | superadmin, owner (propio)                              |
+| `POST`   | `/restaurants/:restaurantId/tables/:id/inactivate` | superadmin, owner (propio)                              |
+| `POST`   | `/restaurants/:restaurantId/tables/:id/activate`   | superadmin, owner (propio)                              |
 | `GET`    | `/restaurants/:restaurantId/requests/active` | superadmin, owner, employee (propio)                    |
 | `PATCH`  | `/requests/:requestId`                       | superadmin, owner, employee                             |
 | `POST`   | `/admin/users`                               | superadmin, owner (solo employees propios)              |
@@ -90,6 +92,15 @@ AdminRole:     superadmin | owner | employee
 ---
 
 ### Rutas públicas
+
+#### `GET /health` — Health check
+
+```json
+// Response 200
+{ "status": "ok" }
+```
+
+---
 
 #### `POST /session` — Iniciar sesión con QR
 
@@ -254,7 +265,7 @@ Respuesta `204`. Errores: `403` · `404`
 
 #### `GET /ws/:restaurantId`
 
-Acepta `?token=<jwt>` — válido con session token o admin token cuyo `restaurant_id` coincida.  
+Acepta `?token=<jwt>` — intenta admin token primero, luego session token. El `restaurant_id` del claims debe coincidir con `:restaurantId`.  
 Emite eventos en tiempo real cuando se crean o actualizan solicitudes.
 
 ---
@@ -278,18 +289,9 @@ INFO  superadmin created — change this password immediately
 | `DATABASE_URL`    | PostgreSQL DSN                             | —           |
 | `SESSION_SECRET`  | Secret HMAC para tokens de cliente         | —           |
 | `ADMIN_SECRET`    | Secret HMAC para tokens de admin           | —           |
-| `ALLOWED_ORIGINS` | Orígenes permitidos CORS (comma-separated) | acepta todo |
-| `PORT`            | Puerto del servidor                        | `8080`      |
-
----
-
-### Regenerar QR de una mesa (admin)
-
-```
-POST /admin/tables/:id/regenerate-qr
-```
-
-Respuesta `200`: `{ "qr_code": "NUEVOCOD10" }`
+| `ALLOWED_ORIGINS`           | Orígenes permitidos CORS (comma-separated)   | acepta todo |
+| `PORT`                      | Puerto del servidor                          | `8080`      |
+| `SEED_ADMIN_RESTAURANT_ID` | UUID del restaurante para el admin inicial   | —           |
 
 ---
 
@@ -301,7 +303,7 @@ Respuesta `200`: `{ "qr_code": "NUEVOCOD10" }`
 ws://localhost:8080/api/v1/ws/:restaurantId?token=<session_token>
 ```
 
-El `session_token` debe pertenecer a una mesa de ese restaurante (mismo `restaurant_id` en el JWT). Si el token es de otro restaurante → `403`.
+Acepta JWT de admin (firmado con `ADMIN_SECRET`) o de sesión de cliente (firmado con `SESSION_SECRET`). El `restaurant_id` del claims debe coincidir con `:restaurantId`. Si el token es de otro restaurante → `403`.
 
 ### Eventos recibidos
 
@@ -378,7 +380,7 @@ Cliente → Backend → Evento → Restaurante → Atención
 
 Backend:
 
-- Go (Gin / Fiber)
+- Go (Gin)
 - WebSockets
 
 Frontend:

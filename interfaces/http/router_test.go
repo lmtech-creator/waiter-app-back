@@ -50,15 +50,17 @@ func buildTestRouter(t *testing.T) *gin.Engine {
 	feedbackUC := usecase.NewFeedbackUseCase(feedbackRepo, tableRepo)
 	restaurantUC := usecase.NewRestaurantUseCase(restaurantRepo, tableRepo)
 	adminUC := usecase.NewAdminUseCase(adminRepo, []byte("admin-test-secret-32bytes-enough"))
+	statsUC := usecase.NewStatsUseCase(requestRepo, feedbackRepo)
 
 	requestHandler := NewRequestHandler(requestUC)
 	feedbackHandler := NewFeedbackHandler(feedbackUC)
 	restaurantHandler := NewRestaurantHandler(restaurantUC)
 	sessionHandler := NewSessionHandler(tableRepo, []byte("test-secret-that-is-long-enough!!"))
 	adminHandler := NewAdminHandler(adminUC)
+	statsHandler := NewStatsHandler(statsUC)
 	hub := ws.NewHub(nil)
 
-	return SetupRouter(requestHandler, feedbackHandler, restaurantHandler, sessionHandler, adminHandler, hub, []byte("test-secret-that-is-long-enough!!"), []byte("admin-test-secret-32bytes-enough"))
+	return SetupRouter(requestHandler, feedbackHandler, restaurantHandler, sessionHandler, adminHandler, statsHandler, hub, []byte("test-secret-that-is-long-enough!!"), []byte("admin-test-secret-32bytes-enough"))
 }
 
 func TestSetupRouter_HealthCheck(t *testing.T) {
@@ -83,6 +85,7 @@ func TestSetupRouter_RoutesExist(t *testing.T) {
 		"GET:/api/v1/tables/:tableId/status":                           "",
 		"POST:/api/v1/feedback":                                        "",
 		"GET:/api/v1/restaurants/:restaurantId/requests/active":        "",
+		"GET:/api/v1/restaurants/:restaurantId/feedback":              "",
 		"PATCH:/api/v1/requests/:requestId":                            "",
 		"POST:/api/v1/restaurants":                                     "",
 		"GET:/api/v1/restaurants":                                      "",
@@ -93,9 +96,11 @@ func TestSetupRouter_RoutesExist(t *testing.T) {
 		"POST:/api/v1/restaurants/:restaurantId/tables/:id/activate":   "",
 		"POST:/api/v1/admin/tables/:id/regenerate-qr":                  "",
 		"POST:/api/v1/admin/login":                                     "",
-		"POST:/api/v1/admin/users":                                     "",
-		"GET:/api/v1/admin/users":                                      "",
-		"DELETE:/api/v1/admin/users/:id":                               "",
+		"POST:/api/v1/admin/users":                                      "",
+		"GET:/api/v1/admin/users":                                       "",
+		"PATCH:/api/v1/admin/users/:id":                                 "",
+		"POST:/api/v1/admin/users/:id/reset-password":                   "",
+		"DELETE:/api/v1/admin/users/:id":                                "",
 		"GET:/api/v1/ws/:restaurantId":                                 "",
 		"GET:/health":                                                  "",
 	}

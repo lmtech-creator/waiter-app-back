@@ -2,8 +2,10 @@ package mocks
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/waiter/back/domain/entity"
+	"github.com/waiter/back/domain/repository"
 )
 
 // --- RestaurantRepository Mock ---
@@ -166,13 +168,17 @@ func (m *TableRepo) ReactiVateTable(id string) error {
 // --- RequestRepository Mock ---
 
 type RequestRepo struct {
-	Requests                 map[string]*entity.Request
-	CreateFn                 func(r *entity.Request) error
-	FindByIDFn               func(id string) (*entity.Request, error)
-	FindActiveFn             func(restaurantID string) ([]entity.Request, error)
-	FindByTableFn            func(tableID string) ([]entity.Request, error)
-	FindLastCreatedByTableFn func(tableID string) (*entity.Request, error)
-	UpdateStatusFn           func(id string, status entity.RequestStatus) error
+	Requests                    map[string]*entity.Request
+	CreateFn                    func(r *entity.Request) error
+	FindByIDFn                  func(id string) (*entity.Request, error)
+	FindActiveFn                func(restaurantID string) ([]entity.Request, error)
+	FindByTableFn               func(tableID string) ([]entity.Request, error)
+	FindLastCreatedByTableFn    func(tableID string) (*entity.Request, error)
+	UpdateStatusFn              func(id string, status entity.RequestStatus) error
+	UpdateCompletedAtFn         func(id string, t time.Time) error
+	CountServedTablesFn         func(restaurantID string, since, until time.Time) (int, error)
+	AvgServiceTimeFn            func(restaurantID string, since, until time.Time) (float64, error)
+	UsageByHourFn               func(restaurantID string, since, until time.Time) ([]repository.HourCount, error)
 }
 
 func NewRequestRepo() *RequestRepo {
@@ -236,6 +242,39 @@ func (m *RequestRepo) UpdateStatus(id string, status entity.RequestStatus) error
 	return nil
 }
 
+func (m *RequestRepo) UpdateCompletedAt(id string, t time.Time) error {
+	if m.UpdateCompletedAtFn != nil {
+		return m.UpdateCompletedAtFn(id, t)
+	}
+	r, ok := m.Requests[id]
+	if !ok {
+		return fmt.Errorf("request not found")
+	}
+	r.CompletedAt = &t
+	return nil
+}
+
+func (m *RequestRepo) CountServedTables(restaurantID string, since, until time.Time) (int, error) {
+	if m.CountServedTablesFn != nil {
+		return m.CountServedTablesFn(restaurantID, since, until)
+	}
+	return 0, nil
+}
+
+func (m *RequestRepo) AvgServiceTime(restaurantID string, since, until time.Time) (float64, error) {
+	if m.AvgServiceTimeFn != nil {
+		return m.AvgServiceTimeFn(restaurantID, since, until)
+	}
+	return 0, nil
+}
+
+func (m *RequestRepo) UsageByHour(restaurantID string, since, until time.Time) ([]repository.HourCount, error) {
+	if m.UsageByHourFn != nil {
+		return m.UsageByHourFn(restaurantID, since, until)
+	}
+	return nil, nil
+}
+
 func (m *RequestRepo) FindLastCreatedByTableID(tableID string) (*entity.Request, error) {
 	if m.FindLastCreatedByTableFn != nil {
 		return m.FindLastCreatedByTableFn(tableID)
@@ -257,9 +296,11 @@ func (m *RequestRepo) FindLastCreatedByTableID(tableID string) (*entity.Request,
 // --- FeedbackRepository Mock ---
 
 type FeedbackRepo struct {
-	Feedbacks     map[string]*entity.Feedback
-	CreateFn      func(f *entity.Feedback) error
-	FindByTableFn func(tableID string) ([]entity.Feedback, error)
+	Feedbacks       map[string]*entity.Feedback
+	CreateFn        func(f *entity.Feedback) error
+	FindByTableFn   func(tableID string) ([]entity.Feedback, error)
+	FindByRIDFn     func(restaurantID string) ([]entity.Feedback, error)
+	AvgScoreByHourFn func(restaurantID string, since, until time.Time) ([]repository.HourScore, error)
 }
 
 func NewFeedbackRepo() *FeedbackRepo {
@@ -272,6 +313,25 @@ func (m *FeedbackRepo) Create(f *entity.Feedback) error {
 	}
 	m.Feedbacks[f.ID] = f
 	return nil
+}
+
+func (m *FeedbackRepo) AvgScoreByHour(restaurantID string, since, until time.Time) ([]repository.HourScore, error) {
+	if m.AvgScoreByHourFn != nil {
+		return m.AvgScoreByHourFn(restaurantID, since, until)
+	}
+	return nil, nil
+}
+
+func (m *FeedbackRepo) FindByRestaurantID(restaurantID string) ([]entity.Feedback, error) {
+	if m.FindByRIDFn != nil {
+		return m.FindByRIDFn(restaurantID)
+	}
+	var list []entity.Feedback
+	// Without table map, return all (simplified mock)
+	for _, f := range m.Feedbacks {
+		list = append(list, *f)
+	}
+	return list, nil
 }
 
 func (m *FeedbackRepo) FindByTableID(tableID string) ([]entity.Feedback, error) {
@@ -315,6 +375,7 @@ type AdminRepo struct {
 	FindByRestaurantFn func(restaurantID string) ([]entity.AdminUser, error)
 	FindAllFn          func() ([]entity.AdminUser, error)
 	CreateFn           func(admin *entity.AdminUser) error
+	UpdateFn           func(admin *entity.AdminUser) error
 	ExistsAnyFn        func() (bool, error)
 	DeleteByIDFn       func(id string) error
 }
@@ -383,6 +444,14 @@ func (m *AdminRepo) ExistsAny() (bool, error) {
 		return m.ExistsAnyFn()
 	}
 	return len(m.Admins) > 0, nil
+}
+
+func (m *AdminRepo) Update(admin *entity.AdminUser) error {
+	if m.UpdateFn != nil {
+		return m.UpdateFn(admin)
+	}
+	m.Admins[admin.ID] = admin
+	return nil
 }
 
 func (m *AdminRepo) DeleteByID(id string) error {

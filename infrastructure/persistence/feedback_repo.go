@@ -1,7 +1,10 @@
 package persistence
 
 import (
+	"time"
+
 	"github.com/waiter/back/domain/entity"
+	"github.com/waiter/back/domain/repository"
 	"gorm.io/gorm"
 )
 
@@ -15,6 +18,29 @@ func NewFeedbackRepo(db *gorm.DB) *FeedbackRepo {
 
 func (r *FeedbackRepo) Create(feedback *entity.Feedback) error {
 	return r.db.Create(feedback).Error
+}
+
+func (r *FeedbackRepo) AvgScoreByHour(restaurantID string, since, until time.Time) ([]repository.HourScore, error) {
+	var results []repository.HourScore
+	err := r.db.Model(&entity.Feedback{}).
+		Joins("JOIN tables ON tables.id = feedbacks.table_id").
+		Where("tables.restaurant_id = ? AND feedbacks.created_at BETWEEN ? AND ?", restaurantID, since, until).
+		Select("EXTRACT(HOUR FROM feedbacks.created_at)::int AS hour, AVG(feedbacks.score) AS avg_score").
+		Group("hour").
+		Order("hour").
+		Scan(&results).Error
+	return results, err
+}
+
+func (r *FeedbackRepo) FindByRestaurantID(restaurantID string) ([]entity.Feedback, error) {
+	var feedbacks []entity.Feedback
+	if err := r.db.Joins("JOIN tables ON tables.id = feedbacks.table_id").
+		Where("tables.restaurant_id = ?", restaurantID).
+		Order("feedbacks.created_at DESC").
+		Find(&feedbacks).Error; err != nil {
+		return nil, err
+	}
+	return feedbacks, nil
 }
 
 func (r *FeedbackRepo) FindByTableID(tableID string) ([]entity.Feedback, error) {

@@ -18,9 +18,10 @@ func NewFeedbackUseCase(fr repository.FeedbackRepository, tr repository.TableRep
 }
 
 type CreateFeedbackInput struct {
-	TableID string `json:"table_id" binding:"required"`
-	Score   int    `json:"score" binding:"required,min=1,max=5"`
-	Comment string `json:"comment"`
+	TableID   string  `json:"table_id" binding:"required"`
+	Score     int     `json:"score" binding:"required,min=1,max=5"`
+	Comment   string  `json:"comment"`
+	RequestID *string `json:"request_id,omitempty"`
 }
 
 func (uc *FeedbackUseCase) CreateFeedback(input CreateFeedbackInput) (*entity.Feedback, error) {
@@ -33,10 +34,11 @@ func (uc *FeedbackUseCase) CreateFeedback(input CreateFeedbackInput) (*entity.Fe
 	}
 
 	fb := &entity.Feedback{
-		ID:      uuid.New().String(),
-		TableID: input.TableID,
-		Score:   input.Score,
-		Comment: input.Comment,
+		ID:        uuid.New().String(),
+		TableID:   input.TableID,
+		RequestID: input.RequestID,
+		Score:     input.Score,
+		Comment:   input.Comment,
 	}
 
 	if err := uc.feedbackRepo.Create(fb); err != nil {
@@ -48,4 +50,8 @@ func (uc *FeedbackUseCase) CreateFeedback(input CreateFeedbackInput) (*entity.Fe
 
 func (uc *FeedbackUseCase) GetFeedbackByTable(tableID string) ([]entity.Feedback, error) {
 	return uc.feedbackRepo.FindByTableID(tableID)
+}
+
+func (uc *FeedbackUseCase) GetFeedbackByRestaurant(restaurantID string) ([]entity.Feedback, error) {
+	return uc.feedbackRepo.FindByRestaurantID(restaurantID)
 }

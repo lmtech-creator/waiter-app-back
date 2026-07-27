@@ -44,6 +44,8 @@ definitions:
     properties:
       comment:
         type: string
+      request_id:
+        type: string
       score:
         maximum: 5
         minimum: 1
@@ -67,6 +69,12 @@ definitions:
         type: string
       plan:
         type: string
+      qr_banner_text:
+        type: string
+      qr_footer_items:
+        items:
+          type: string
+        type: array
     required:
     - name
     type: object
@@ -92,10 +100,26 @@ definitions:
         type: string
       id:
         type: string
+      request_id:
+        type: string
       score:
         type: integer
       table_id:
         type: string
+    type: object
+  dto.HourCountDTO:
+    properties:
+      count:
+        type: integer
+      hour:
+        type: integer
+    type: object
+  dto.HourScoreDTO:
+    properties:
+      avg_score:
+        type: number
+      hour:
+        type: integer
     type: object
   dto.RequestResponse:
     properties:
@@ -110,6 +134,11 @@ definitions:
       type:
         $ref: '#/definitions/entity.RequestType'
     type: object
+  dto.ResetPasswordResponse:
+    properties:
+      new_password:
+        type: string
+    type: object
   dto.RestaurantResponse:
     properties:
       id:
@@ -118,6 +147,12 @@ definitions:
         type: string
       plan:
         type: string
+      qr_banner_text:
+        type: string
+      qr_footer_items:
+        items:
+          type: string
+        type: array
     type: object
   dto.SessionRequest:
     properties:
@@ -130,6 +165,21 @@ definitions:
         type: string
       table:
         $ref: '#/definitions/dto.TablePublic'
+    type: object
+  dto.StatsResponse:
+    properties:
+      avg_service_time_seconds:
+        type: number
+      score_by_hour:
+        items:
+          $ref: '#/definitions/dto.HourScoreDTO'
+        type: array
+      total_tables_served:
+        type: integer
+      usage_by_hour:
+        items:
+          $ref: '#/definitions/dto.HourCountDTO'
+        type: array
     type: object
   dto.TablePublic:
     properties:
@@ -145,6 +195,13 @@ definitions:
       qr_code:
         type: string
       restaurant_id:
+        type: string
+    type: object
+  dto.UpdateAdminUserRequest:
+    properties:
+      password:
+        type: string
+      username:
         type: string
     type: object
   dto.UpdateRequestStatusRequest:
@@ -331,6 +388,77 @@ paths:
       security:
       - AdminToken: []
       summary: Eliminar usuario administrador
+      tags:
+      - admin
+    patch:
+      consumes:
+      - application/json
+      description: Actualiza nombre de usuario y/o contraseña. Superadmin puede modificar
+        cualquier usuario; owner solo employees de su restaurante.
+      parameters:
+      - description: ID del usuario
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Campos a modificar
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateAdminUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.AdminUserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Modificar usuario administrador
+      tags:
+      - admin
+  /api/v1/admin/users/{id}/reset-password:
+    post:
+      description: Genera una nueva contraseña aleatoria para el usuario. Superadmin
+        puede blanquear cualquier usuario; owner solo employees de su restaurante.
+      parameters:
+      - description: ID del usuario
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.ResetPasswordResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Blanquear contraseña de usuario administrador
       tags:
       - admin
   /api/v1/feedback:
@@ -523,6 +651,34 @@ paths:
       summary: Obtener restaurante
       tags:
       - restaurants
+  /api/v1/restaurants/{restaurantId}/feedback:
+    get:
+      description: Retorna todos los feedbacks del restaurante (solo superadmin y
+        owner)
+      parameters:
+      - description: ID del restaurante
+        in: path
+        name: restaurantId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.FeedbackResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Listar feedbacks del restaurante
+      tags:
+      - feedback
   /api/v1/restaurants/{restaurantId}/requests/active:
     get:
       description: Retorna las solicitudes activas de un restaurante
@@ -550,6 +706,46 @@ paths:
       summary: Obtener solicitudes activas
       tags:
       - requests
+  /api/v1/restaurants/{restaurantId}/stats:
+    get:
+      description: Retorna estadísticas operativas del restaurante en un rango de
+        fechas
+      parameters:
+      - description: ID del restaurante
+        in: path
+        name: restaurantId
+        required: true
+        type: string
+      - description: Fecha inicio (RFC3339)
+        in: query
+        name: since
+        required: true
+        type: string
+      - description: Fecha fin (RFC3339)
+        in: query
+        name: until
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.StatsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Estadísticas del restaurante
+      tags:
+      - restaurants
   /api/v1/restaurants/{restaurantId}/tables:
     get:
       description: Retorna las mesas de un restaurante

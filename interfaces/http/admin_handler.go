@@ -161,3 +161,84 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 
 	c.Status(http.StatusNoContent)
 }
+
+// UpdateUser godoc
+// @Summary      Modificar usuario administrador
+// @Description  Actualiza nombre de usuario y/o contraseña. Superadmin puede modificar cualquier usuario; owner solo employees de su restaurante.
+// @Tags         admin
+// @Accept       json
+// @Produce      json
+// @Param        id       path    string                      true  "ID del usuario"
+// @Param        request  body    dto.UpdateAdminUserRequest   true  "Campos a modificar"
+// @Success      200      {object}  dto.AdminUserResponse
+// @Failure      400      {object}  dto.ErrorResponse
+// @Failure      403      {object}  dto.ErrorResponse
+// @Failure      404      {object}  dto.ErrorResponse
+// @Security     AdminToken
+// @Router       /api/v1/admin/users/{id} [patch]
+func (h *AdminHandler) UpdateUser(c *gin.Context) {
+	claims := mw.GetAdminClaims(c)
+	targetID := c.Param("id")
+
+	var req dto.UpdateAdminUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "validation_error", Message: err.Error()})
+		return
+	}
+
+	admin, err := h.uc.UpdateAdminUser(usecase.UpdateAdminInput{
+		RequesterRole:         entity.AdminRole(claims.Role),
+		RequesterRestaurantID: claims.RestaurantID,
+		TargetID:              targetID,
+		Username:              req.Username,
+		Password:              req.Password,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, usecase.ErrForbidden):
+			c.JSON(http.StatusForbidden, dto.ErrorResponse{Error: "forbidden", Message: "Operación no permitida."})
+		case errors.Is(err, usecase.ErrUserNotFound):
+			c.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "not_found", Message: "Usuario no encontrado."})
+		default:
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "bad_request", Message: err.Error()})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.ToAdminUserResponse(admin))
+}
+
+// ResetPassword godoc
+// @Summary      Blanquear contraseña de usuario administrador
+// @Description  Genera una nueva contraseña aleatoria para el usuario. Superadmin puede blanquear cualquier usuario; owner solo employees de su restaurante.
+// @Tags         admin
+// @Produce      json
+// @Param        id   path      string  true  "ID del usuario"
+// @Success      200  {object}  dto.ResetPasswordResponse
+// @Failure      403  {object}  dto.ErrorResponse
+// @Failure      404  {object}  dto.ErrorResponse
+// @Security     AdminToken
+// @Router       /api/v1/admin/users/{id}/reset-password [post]
+func (h *AdminHandler) ResetPassword(c *gin.Context) {
+	claims := mw.GetAdminClaims(c)
+	targetID := c.Param("id")
+
+	out, err := h.uc.ResetPassword(usecase.ResetPasswordInput{
+		RequesterRole:         entity.AdminRole(claims.Role),
+		RequesterRestaurantID: claims.RestaurantID,
+		TargetID:              targetID,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, usecase.ErrForbidden):
+			c.JSON(http.StatusForbidden, dto.ErrorResponse{Error: "forbidden", Message: "Operación no permitida."})
+		case errors.Is(err, usecase.ErrUserNotFound):
+			c.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "not_found", Message: "Usuario no encontrado."})
+		default:
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "internal_error", Message: err.Error()})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.ResetPasswordResponse{NewPassword: out.NewPassword})
+}

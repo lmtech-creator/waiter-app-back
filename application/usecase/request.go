@@ -105,6 +105,11 @@ func (uc *RequestUseCase) CompleteRequest(id string) error {
 		return fmt.Errorf("failed to update request: %w", err)
 	}
 
+	now := time.Now()
+	if err := uc.requestRepo.UpdateCompletedAt(id, now); err != nil {
+		return fmt.Errorf("failed to set completed_at: %w", err)
+	}
+
 	table, err := uc.tableRepo.FindByID(req.TableID)
 	if err == nil {
 		uc.notifier.Notify(table.RestaurantID, map[string]any{

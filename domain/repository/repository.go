@@ -1,6 +1,10 @@
 package repository
 
-import "github.com/waiter/back/domain/entity"
+import (
+	"time"
+
+	"github.com/waiter/back/domain/entity"
+)
 
 type RestaurantRepository interface {
 	Create(restaurant *entity.Restaurant) error
@@ -19,6 +23,16 @@ type TableRepository interface {
 	UpdateQRCode(id, qrCode string) error
 }
 
+type HourCount struct {
+	Hour  int
+	Count int
+}
+
+type HourScore struct {
+	Hour     int
+	AvgScore float64
+}
+
 type RequestRepository interface {
 	Create(request *entity.Request) error
 	FindByID(id string) (*entity.Request, error)
@@ -26,11 +40,17 @@ type RequestRepository interface {
 	FindByTableID(tableID string) ([]entity.Request, error)
 	FindLastCreatedByTableID(tableID string) (*entity.Request, error)
 	UpdateStatus(id string, status entity.RequestStatus) error
+	UpdateCompletedAt(id string, t time.Time) error
+	CountServedTables(restaurantID string, since, until time.Time) (int, error)
+	AvgServiceTime(restaurantID string, since, until time.Time) (float64, error)
+	UsageByHour(restaurantID string, since, until time.Time) ([]HourCount, error)
 }
 
 type FeedbackRepository interface {
 	Create(feedback *entity.Feedback) error
 	FindByTableID(tableID string) ([]entity.Feedback, error)
+	FindByRestaurantID(restaurantID string) ([]entity.Feedback, error)
+	AvgScoreByHour(restaurantID string, since, until time.Time) ([]HourScore, error)
 }
 
 type AdminRepository interface {
@@ -39,6 +59,7 @@ type AdminRepository interface {
 	FindByRestaurantID(restaurantID string) ([]entity.AdminUser, error)
 	FindAll() ([]entity.AdminUser, error)
 	Create(admin *entity.AdminUser) error
+	Update(admin *entity.AdminUser) error
 	ExistsAny() (bool, error)
 	DeleteByID(id string) error
 }

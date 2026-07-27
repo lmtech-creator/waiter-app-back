@@ -67,6 +67,7 @@ func main() {
 	feedbackUC := usecase.NewFeedbackUseCase(feedbackRepo, tableRepo)
 	restaurantUC := usecase.NewRestaurantUseCase(restaurantRepo, tableRepo)
 	adminUC := usecase.NewAdminUseCase(adminRepo, adminSecret)
+	statsUC := usecase.NewStatsUseCase(requestRepo, feedbackRepo)
 
 	// Seed superadmin on first run.
 	if seeded, username, password, err := usecase.SeedAdminIfNeeded(adminRepo); err != nil {
@@ -84,12 +85,13 @@ func main() {
 	restaurantHandler := handler.NewRestaurantHandler(restaurantUC)
 	sessionHandler := handler.NewSessionHandler(tableRepo, secret)
 	adminHandler := handler.NewAdminHandler(adminUC)
+	statsHandler := handler.NewStatsHandler(statsUC)
 
 	// Background tasks
 	go mw.StartLimiterCleanup()
 
 	// Router
-	router := handler.SetupRouter(requestHandler, feedbackHandler, restaurantHandler, sessionHandler, adminHandler, hub, secret, adminSecret)
+	router := handler.SetupRouter(requestHandler, feedbackHandler, restaurantHandler, sessionHandler, adminHandler, statsHandler, hub, secret, adminSecret)
 
 	zap.L().Info("server starting", zap.String("port", cfg.Port))
 	if err := router.Run(":" + cfg.Port); err != nil {

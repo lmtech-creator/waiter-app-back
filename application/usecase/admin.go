@@ -150,22 +150,116 @@ func (uc *AdminUseCase) DeleteAdminUser(requesterRole entity.AdminRole, requeste
 		return ErrUserNotFound
 	}
 
+	if err := uc.canModifyUser(requesterRole, requesterRestaurantID, target); err != nil {
+		return err
+	}
+
+	return uc.repo.DeleteByID(targetID)
+}
+
+// ─── UpdateAdminUser ──────────────────────────────────────────────────────────
+
+type UpdateAdminInput struct {
+	RequesterRole         entity.AdminRole
+	RequesterRestaurantID string
+	TargetID              string
+	Username              *string // nil = no change
+	Password              *string // nil = no change
+}
+
+func (uc *AdminUseCase) UpdateAdminUser(input UpdateAdminInput) (*entity.AdminUser, error) {
+	target, err := uc.repo.FindByID(input.TargetID)
+	if err != nil || target == nil {
+		return nil, ErrUserNotFound
+	}
+
+	// Permission check (same as Delete).
+	if err := uc.canModifyUser(input.RequesterRole, input.RequesterRestaurantID, target); err != nil {
+		return nil, err
+	}
+
+	if input.Username != nil {
+		if *input.Username == "" {
+			return nil, fmt.Errorf("username cannot be empty")
+		}
+		target.Username = *input.Username
+	}
+
+	if input.Password != nil {
+		if *input.Password == "" {
+			return nil, fmt.Errorf("password cannot be empty")
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(*input.Password), 12)
+		if err != nil {
+			return nil, fmt.Errorf("hashing password: %w", err)
+		}
+		target.PasswordHash = string(hash)
+	}
+
+	if err := uc.repo.Update(target); err != nil {
+		return nil, fmt.Errorf("updating admin user: %w", err)
+	}
+
+	return target, nil
+}
+
+// ─── ResetPassword ──────────────────────────────────────────────────────────
+
+type ResetPasswordInput struct {
+	RequesterRole         entity.AdminRole
+	RequesterRestaurantID string
+	TargetID              string
+}
+
+type ResetPasswordOutput struct {
+	NewPassword string
+}
+
+func (uc *AdminUseCase) ResetPassword(input ResetPasswordInput) (*ResetPasswordOutput, error) {
+	target, err := uc.repo.FindByID(input.TargetID)
+	if err != nil || target == nil {
+		return nil, ErrUserNotFound
+	}
+
+	if err := uc.canModifyUser(input.RequesterRole, input.RequesterRestaurantID, target); err != nil {
+		return nil, err
+	}
+
+	rawPassword, err := generatePassword(16)
+	if err != nil {
+		return nil, fmt.Errorf("generating password: %w", err)
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(rawPassword), 12)
+	if err != nil {
+		return nil, fmt.Errorf("hashing password: %w", err)
+	}
+
+	target.PasswordHash = string(hash)
+
+	if err := uc.repo.Update(target); err != nil {
+		return nil, fmt.Errorf("updating admin user: %w", err)
+	}
+
+	return &ResetPasswordOutput{NewPassword: rawPassword}, nil
+}
+
+// canModifyUser checks whether the requester has permission to modify/delete the target user.
+func (uc *AdminUseCase) canModifyUser(requesterRole entity.AdminRole, requesterRestaurantID string, target *entity.AdminUser) error {
 	switch requesterRole {
 	case entity.RoleSuperAdmin:
-		// can delete any user
+		return nil
 	case entity.RoleOwner:
-		// can only delete employees of their own restaurant
 		if target.Role != entity.RoleEmployee {
 			return ErrForbidden
 		}
 		if target.RestaurantID == nil || *target.RestaurantID != requesterRestaurantID {
 			return ErrForbidden
 		}
+		return nil
 	default:
 		return ErrForbidden
 	}
-
-	return uc.repo.DeleteByID(targetID)
 }
 
 // ─── SeedAdminIfNeeded ────────────────────────────────────────────────────────

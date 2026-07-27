@@ -39,8 +39,10 @@ func (h *RestaurantHandler) Create(c *gin.Context) {
 	}
 
 	r, err := h.uc.CreateRestaurant(usecase.CreateRestaurantInput{
-		Name: req.Name,
-		Plan: req.Plan,
+		Name:          req.Name,
+		Plan:          req.Plan,
+		QrBannerText:  req.QrBannerText,
+		QrFooterItems: req.QrFooterItems,
 	})
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, dto.ErrorResponse{Error: "unprocessable_entity", Message: err.Error()})

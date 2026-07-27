@@ -16,6 +16,7 @@ func SetupRouter(
 	restaurantHandler *RestaurantHandler,
 	sessionHandler *SessionHandler,
 	adminHandler *AdminHandler,
+	statsHandler *StatsHandler,
 	hub *ws.Hub,
 	secret []byte,
 	adminSecret []byte,
@@ -78,6 +79,8 @@ func SetupRouter(
 		{
 			userMgmt.POST("/admin/users", adminHandler.CreateUser)
 			userMgmt.GET("/admin/users", adminHandler.ListUsers)
+			userMgmt.PATCH("/admin/users/:id", adminHandler.UpdateUser)
+			userMgmt.POST("/admin/users/:id/reset-password", adminHandler.ResetPassword)
 			userMgmt.DELETE("/admin/users/:id", adminHandler.DeleteUser)
 		}
 
@@ -92,6 +95,8 @@ func SetupRouter(
 			ownerOrAbove.POST("/restaurants/:restaurantId/tables/:id/inactivate", restaurantHandler.InactivateTable)
 			ownerOrAbove.POST("/restaurants/:restaurantId/tables/:id/activate", restaurantHandler.ActivateTable)
 			ownerOrAbove.POST("/admin/tables/:id/regenerate-qr", restaurantHandler.RegenerateQR)
+			ownerOrAbove.GET("/restaurants/:restaurantId/feedback", feedbackHandler.GetByRestaurant)
+			ownerOrAbove.GET("/restaurants/:restaurantId/stats", statsHandler.Get)
 		}
 
 		// ── Employee + Owner + Superadmin (operational routes) ───────────────

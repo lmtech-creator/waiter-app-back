@@ -3,6 +3,7 @@ package dto
 import (
 	"time"
 
+	"github.com/waiter/back/application/usecase"
 	"github.com/waiter/back/domain/entity"
 )
 
@@ -22,8 +23,10 @@ type TablePublic struct {
 }
 
 type CreateRestaurantRequest struct {
-	Name string `json:"name" binding:"required"`
-	Plan string `json:"plan"`
+	Name          string   `json:"name" binding:"required"`
+	Plan          string   `json:"plan"`
+	QrBannerText  string   `json:"qr_banner_text"`
+	QrFooterItems []string `json:"qr_footer_items"`
 }
 
 type CreateTableRequest struct {
@@ -39,17 +42,20 @@ type UpdateRequestStatusRequest struct {
 }
 
 type CreateFeedbackRequest struct {
-	TableID string `json:"table_id" binding:"required"`
-	Score   int    `json:"score" binding:"required,min=1,max=5"`
-	Comment string `json:"comment"`
+	TableID   string  `json:"table_id" binding:"required"`
+	Score     int     `json:"score" binding:"required,min=1,max=5"`
+	Comment   string  `json:"comment"`
+	RequestID *string `json:"request_id,omitempty"`
 }
 
 // ─── Response DTOs ───
 
 type RestaurantResponse struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Plan string `json:"plan"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Plan          string   `json:"plan"`
+	QrBannerText  string   `json:"qr_banner_text"`
+	QrFooterItems []string `json:"qr_footer_items"`
 }
 
 type TableResponse struct {
@@ -68,11 +74,12 @@ type RequestResponse struct {
 }
 
 type FeedbackResponse struct {
-	ID        string    `json:"id"`
-	TableID   string    `json:"table_id"`
-	Score     int       `json:"score"`
-	Comment   string    `json:"comment,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        string     `json:"id"`
+	TableID   string     `json:"table_id"`
+	RequestID *string    `json:"request_id,omitempty"`
+	Score     int        `json:"score"`
+	Comment   string     `json:"comment,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
 }
 
 type ErrorResponse struct {
@@ -98,6 +105,15 @@ type CreateAdminUserRequest struct {
 	RestaurantID string `json:"restaurant_id"`
 }
 
+type UpdateAdminUserRequest struct {
+	Username *string `json:"username,omitempty"`
+	Password *string `json:"password,omitempty"`
+}
+
+type ResetPasswordResponse struct {
+	NewPassword string `json:"new_password"`
+}
+
 type AdminUserResponse struct {
 	ID           string    `json:"id"`
 	Username     string    `json:"username"`
@@ -106,13 +122,38 @@ type AdminUserResponse struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+// ─── Stats DTOs ───
+
+type HourCountDTO struct {
+	Hour  int `json:"hour"`
+	Count int `json:"count"`
+}
+
+type HourScoreDTO struct {
+	Hour     int     `json:"hour"`
+	AvgScore float64 `json:"avg_score"`
+}
+
+type StatsResponse struct {
+	TotalTablesServed int            `json:"total_tables_served"`
+	AvgServiceTimeSec float64        `json:"avg_service_time_seconds"`
+	UsageByHour       []HourCountDTO `json:"usage_by_hour"`
+	ScoreByHour       []HourScoreDTO `json:"score_by_hour"`
+}
+
 // ─── Mappers: Entity → Response ───
 
 func ToRestaurantResponse(r *entity.Restaurant) RestaurantResponse {
+	footer := []string(r.QrFooterItems)
+	if footer == nil {
+		footer = []string{}
+	}
 	return RestaurantResponse{
-		ID:   r.ID,
-		Name: r.Name,
-		Plan: r.Plan,
+		ID:            r.ID,
+		Name:          r.Name,
+		Plan:          r.Plan,
+		QrBannerText:  r.QrBannerText,
+		QrFooterItems: footer,
 	}
 }
 
@@ -155,6 +196,7 @@ func ToFeedbackResponse(f *entity.Feedback) FeedbackResponse {
 	return FeedbackResponse{
 		ID:        f.ID,
 		TableID:   f.TableID,
+		RequestID: f.RequestID,
 		Score:     f.Score,
 		Comment:   f.Comment,
 		CreatedAt: f.CreatedAt,
@@ -176,6 +218,23 @@ func ToAdminUserResponse(a *entity.AdminUser) AdminUserResponse {
 		Role:         string(a.Role),
 		RestaurantID: a.RestaurantID,
 		CreatedAt:    a.CreatedAt,
+	}
+}
+
+func ToStatsResponse(s *usecase.RestaurantStats) StatsResponse {
+	usage := make([]HourCountDTO, len(s.UsageByHour))
+	for i, h := range s.UsageByHour {
+		usage[i] = HourCountDTO{Hour: h.Hour, Count: h.Count}
+	}
+	scores := make([]HourScoreDTO, len(s.ScoreByHour))
+	for i, h := range s.ScoreByHour {
+		scores[i] = HourScoreDTO{Hour: h.Hour, AvgScore: h.AvgScore}
+	}
+	return StatsResponse{
+		TotalTablesServed: s.TotalTablesServed,
+		AvgServiceTimeSec: s.AvgServiceTimeSec,
+		UsageByHour:       usage,
+		ScoreByHour:       scores,
 	}
 }
 

@@ -35,9 +35,10 @@ func (h *FeedbackHandler) Create(c *gin.Context) {
 	}
 
 	fb, err := h.uc.CreateFeedback(usecase.CreateFeedbackInput{
-		TableID: req.TableID,
-		Score:   req.Score,
-		Comment: req.Comment,
+		TableID:   req.TableID,
+		Score:     req.Score,
+		Comment:   req.Comment,
+		RequestID: req.RequestID,
 	})
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, dto.ErrorResponse{Error: "unprocessable_entity", Message: err.Error()})
@@ -45,4 +46,26 @@ func (h *FeedbackHandler) Create(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, dto.ToFeedbackResponse(fb))
+}
+
+// GetByRestaurant godoc
+// @Summary      Listar feedbacks del restaurante
+// @Description  Retorna todos los feedbacks del restaurante (solo superadmin y owner)
+// @Tags         feedback
+// @Produce      json
+// @Param        restaurantId  path  string  true  "ID del restaurante"
+// @Success      200  {array}   dto.FeedbackResponse
+// @Failure      500  {object}  dto.ErrorResponse
+// @Security     AdminToken
+// @Router       /api/v1/restaurants/{restaurantId}/feedback [get]
+func (h *FeedbackHandler) GetByRestaurant(c *gin.Context) {
+	restaurantID := c.Param("restaurantId")
+
+	list, err := h.uc.GetFeedbackByRestaurant(restaurantID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "internal_error", Message: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.ToFeedbackListResponse(list))
 }

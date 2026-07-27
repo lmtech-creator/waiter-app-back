@@ -241,3 +241,256 @@ func TestDeleteAdminUser_NotFound(t *testing.T) {
 		t.Error("expected error for non-existent user")
 	}
 }
+
+// ─── UpdateAdminUser ──────────────────────────────────────────────────────────
+
+func TestUpdateAdminUser_SuperAdminUpdatesUsername(t *testing.T) {
+	repo := mocks.NewAdminRepo()
+	repo.Admins["target"] = &entity.AdminUser{
+		ID: "target", Username: "oldname", Role: entity.RoleEmployee,
+		RestaurantID: strPtr("r1"),
+	}
+	uc := NewAdminUseCase(repo, adminTestSecret)
+
+	newUsername := "newname"
+	updated, err := uc.UpdateAdminUser(UpdateAdminInput{
+		RequesterRole: entity.RoleSuperAdmin,
+		TargetID:      "target",
+		Username:      &newUsername,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if updated.Username != "newname" {
+		t.Errorf("expected username 'newname', got '%s'", updated.Username)
+	}
+}
+
+func TestUpdateAdminUser_SuperAdminUpdatesPassword(t *testing.T) {
+	repo := mocks.NewAdminRepo()
+	repo.Admins["target"] = &entity.AdminUser{
+		ID: "target", Username: "user", PasswordHash: hashPassword(t, "old"),
+		Role: entity.RoleEmployee, RestaurantID: strPtr("r1"),
+	}
+	uc := NewAdminUseCase(repo, adminTestSecret)
+
+	newPw := "newpassword123"
+	_, err := uc.UpdateAdminUser(UpdateAdminInput{
+		RequesterRole: entity.RoleSuperAdmin,
+		TargetID:      "target",
+		Password:      &newPw,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	stored := repo.Admins["target"]
+	if err := bcrypt.CompareHashAndPassword([]byte(stored.PasswordHash), []byte(newPw)); err != nil {
+		t.Error("expected stored password to match new password")
+	}
+}
+
+func TestUpdateAdminUser_OwnerUpdatesOwnEmployee(t *testing.T) {
+	repo := mocks.NewAdminRepo()
+	rid := "r1"
+	repo.Admins["target"] = &entity.AdminUser{
+		ID: "target", Username: "emp", Role: entity.RoleEmployee,
+		RestaurantID: strPtr(rid),
+	}
+	uc := NewAdminUseCase(repo, adminTestSecret)
+
+	newUsername := "updated-emp"
+	updated, err := uc.UpdateAdminUser(UpdateAdminInput{
+		RequesterRole:         entity.RoleOwner,
+		RequesterRestaurantID: rid,
+		TargetID:              "target",
+		Username:              &newUsername,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if updated.Username != "updated-emp" {
+		t.Errorf("expected 'updated-emp', got '%s'", updated.Username)
+	}
+}
+
+func TestUpdateAdminUser_OwnerCannotUpdateOtherRestaurant(t *testing.T) {
+	repo := mocks.NewAdminRepo()
+	repo.Admins["target"] = &entity.AdminUser{
+		ID: "target", Username: "emp", Role: entity.RoleEmployee,
+		RestaurantID: strPtr("r-other"),
+	}
+	uc := NewAdminUseCase(repo, adminTestSecret)
+
+	newUsername := "hacker"
+	_, err := uc.UpdateAdminUser(UpdateAdminInput{
+		RequesterRole:         entity.RoleOwner,
+		RequesterRestaurantID: "r1",
+		TargetID:              "target",
+		Username:              &newUsername,
+	})
+	if err == nil {
+		t.Error("expected error: owner cannot update user of another restaurant")
+	}
+}
+
+func TestUpdateAdminUser_OwnerCannotUpdateOwner(t *testing.T) {
+	repo := mocks.NewAdminRepo()
+	rid := "r1"
+	repo.Admins["target"] = &entity.AdminUser{
+		ID: "target", Username: "owner2", Role: entity.RoleOwner,
+		RestaurantID: strPtr(rid),
+	}
+	uc := NewAdminUseCase(repo, adminTestSecret)
+
+	newUsername := "new"
+	_, err := uc.UpdateAdminUser(UpdateAdminInput{
+		RequesterRole:         entity.RoleOwner,
+		RequesterRestaurantID: rid,
+		TargetID:              "target",
+		Username:              &newUsername,
+	})
+	if err == nil {
+		t.Error("expected error: owner cannot update another owner")
+	}
+}
+
+func TestUpdateAdminUser_EmployeeCannotUpdate(t *testing.T) {
+	repo := mocks.NewAdminRepo()
+	repo.Admins["target"] = &entity.AdminUser{ID: "target", Username: "emp", Role: entity.RoleEmployee}
+	uc := NewAdminUseCase(repo, adminTestSecret)
+
+	newUsername := "new"
+	_, err := uc.UpdateAdminUser(UpdateAdminInput{
+		RequesterRole: entity.RoleEmployee,
+		TargetID:      "target",
+		Username:      &newUsername,
+	})
+	if err == nil {
+		t.Error("expected error: employee cannot update users")
+	}
+}
+
+func TestUpdateAdminUser_NotFound(t *testing.T) {
+	repo := mocks.NewAdminRepo()
+	uc := NewAdminUseCase(repo, adminTestSecret)
+
+	newUsername := "any"
+	_, err := uc.UpdateAdminUser(UpdateAdminInput{
+		RequesterRole: entity.RoleSuperAdmin,
+		TargetID:      "nonexistent",
+		Username:      &newUsername,
+	})
+	if err == nil {
+		t.Error("expected error for non-existent user")
+	}
+}
+
+func TestUpdateAdminUser_EmptyUsernameRejected(t *testing.T) {
+	repo := mocks.NewAdminRepo()
+	repo.Admins["target"] = &entity.AdminUser{ID: "target", Username: "user", Role: entity.RoleEmployee}
+	uc := NewAdminUseCase(repo, adminTestSecret)
+
+	empty := ""
+	_, err := uc.UpdateAdminUser(UpdateAdminInput{
+		RequesterRole: entity.RoleSuperAdmin,
+		TargetID:      "target",
+		Username:      &empty,
+	})
+	if err == nil {
+		t.Error("expected error for empty username")
+	}
+}
+
+func TestUpdateAdminUser_EmptyPasswordRejected(t *testing.T) {
+	repo := mocks.NewAdminRepo()
+	repo.Admins["target"] = &entity.AdminUser{ID: "target", Username: "user", Role: entity.RoleEmployee}
+	uc := NewAdminUseCase(repo, adminTestSecret)
+
+	empty := ""
+	_, err := uc.UpdateAdminUser(UpdateAdminInput{
+		RequesterRole: entity.RoleSuperAdmin,
+		TargetID:      "target",
+		Password:      &empty,
+	})
+	if err == nil {
+		t.Error("expected error for empty password")
+	}
+}
+
+// ─── ResetPassword ────────────────────────────────────────────────────────────
+
+func TestResetPassword_SuperAdmin(t *testing.T) {
+	repo := mocks.NewAdminRepo()
+	repo.Admins["target"] = &entity.AdminUser{
+		ID: "target", Username: "user", PasswordHash: hashPassword(t, "old"),
+		Role: entity.RoleEmployee,
+	}
+	uc := NewAdminUseCase(repo, adminTestSecret)
+
+	out, err := uc.ResetPassword(ResetPasswordInput{
+		RequesterRole: entity.RoleSuperAdmin,
+		TargetID:      "target",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.NewPassword == "" {
+		t.Error("expected non-empty new password")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(repo.Admins["target"].PasswordHash), []byte(out.NewPassword)); err != nil {
+		t.Error("expected stored hash to match new password")
+	}
+}
+
+func TestResetPassword_OwnerResetsOwnEmployee(t *testing.T) {
+	repo := mocks.NewAdminRepo()
+	rid := "r1"
+	repo.Admins["target"] = &entity.AdminUser{
+		ID: "target", Username: "emp", Role: entity.RoleEmployee,
+		RestaurantID: strPtr(rid),
+	}
+	uc := NewAdminUseCase(repo, adminTestSecret)
+
+	out, err := uc.ResetPassword(ResetPasswordInput{
+		RequesterRole:         entity.RoleOwner,
+		RequesterRestaurantID: rid,
+		TargetID:              "target",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.NewPassword == "" {
+		t.Error("expected non-empty new password")
+	}
+}
+
+func TestResetPassword_OwnerCannotResetOtherRestaurant(t *testing.T) {
+	repo := mocks.NewAdminRepo()
+	repo.Admins["target"] = &entity.AdminUser{
+		ID: "target", Username: "emp", Role: entity.RoleEmployee,
+		RestaurantID: strPtr("r-other"),
+	}
+	uc := NewAdminUseCase(repo, adminTestSecret)
+
+	_, err := uc.ResetPassword(ResetPasswordInput{
+		RequesterRole:         entity.RoleOwner,
+		RequesterRestaurantID: "r1",
+		TargetID:              "target",
+	})
+	if err == nil {
+		t.Error("expected error: owner cannot reset password of another restaurant")
+	}
+}
+
+func TestResetPassword_NotFound(t *testing.T) {
+	repo := mocks.NewAdminRepo()
+	uc := NewAdminUseCase(repo, adminTestSecret)
+
+	_, err := uc.ResetPassword(ResetPasswordInput{
+		RequesterRole: entity.RoleSuperAdmin,
+		TargetID:      "nonexistent",
+	})
+	if err == nil {
+		t.Error("expected error for non-existent user")
+	}
+}

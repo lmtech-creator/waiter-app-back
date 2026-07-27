@@ -246,6 +246,114 @@ const docTemplate = `{
                         }
                     }
                 }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
+                "description": "Actualiza nombre de usuario y/o contraseña. Superadmin puede modificar cualquier usuario; owner solo employees de su restaurante.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Modificar usuario administrador",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del usuario",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Campos a modificar",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdateAdminUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.AdminUserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/admin/users/{id}/reset-password": {
+            "post": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
+                "description": "Genera una nueva contraseña aleatoria para el usuario. Superadmin puede blanquear cualquier usuario; owner solo employees de su restaurante.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Blanquear contraseña de usuario administrador",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del usuario",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ResetPasswordResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/api/v1/feedback": {
@@ -545,6 +653,49 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/restaurants/{restaurantId}/feedback": {
+            "get": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
+                "description": "Retorna todos los feedbacks del restaurante (solo superadmin y owner)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "feedback"
+                ],
+                "summary": "Listar feedbacks del restaurante",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del restaurante",
+                        "name": "restaurantId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.FeedbackResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/restaurants/{restaurantId}/requests/active": {
             "get": {
                 "security": [
@@ -577,6 +728,66 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/dto.RequestResponse"
                             }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/restaurants/{restaurantId}/stats": {
+            "get": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
+                "description": "Retorna estadísticas operativas del restaurante en un rango de fechas",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "restaurants"
+                ],
+                "summary": "Estadísticas del restaurante",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del restaurante",
+                        "name": "restaurantId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fecha inicio (RFC3339)",
+                        "name": "since",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fecha fin (RFC3339)",
+                        "name": "until",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.StatsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
@@ -1033,6 +1244,9 @@ const docTemplate = `{
                 "comment": {
                     "type": "string"
                 },
+                "request_id": {
+                    "type": "string"
+                },
                 "score": {
                     "type": "integer",
                     "maximum": 5,
@@ -1065,6 +1279,15 @@ const docTemplate = `{
                 },
                 "plan": {
                     "type": "string"
+                },
+                "qr_banner_text": {
+                    "type": "string"
+                },
+                "qr_footer_items": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -1102,11 +1325,36 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "request_id": {
+                    "type": "string"
+                },
                 "score": {
                     "type": "integer"
                 },
                 "table_id": {
                     "type": "string"
+                }
+            }
+        },
+        "dto.HourCountDTO": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "hour": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.HourScoreDTO": {
+            "type": "object",
+            "properties": {
+                "avg_score": {
+                    "type": "number"
+                },
+                "hour": {
+                    "type": "integer"
                 }
             }
         },
@@ -1130,6 +1378,14 @@ const docTemplate = `{
                 }
             }
         },
+        "dto.ResetPasswordResponse": {
+            "type": "object",
+            "properties": {
+                "new_password": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.RestaurantResponse": {
             "type": "object",
             "properties": {
@@ -1141,6 +1397,15 @@ const docTemplate = `{
                 },
                 "plan": {
                     "type": "string"
+                },
+                "qr_banner_text": {
+                    "type": "string"
+                },
+                "qr_footer_items": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -1160,6 +1425,29 @@ const docTemplate = `{
                 },
                 "table": {
                     "$ref": "#/definitions/dto.TablePublic"
+                }
+            }
+        },
+        "dto.StatsResponse": {
+            "type": "object",
+            "properties": {
+                "avg_service_time_seconds": {
+                    "type": "number"
+                },
+                "score_by_hour": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.HourScoreDTO"
+                    }
+                },
+                "total_tables_served": {
+                    "type": "integer"
+                },
+                "usage_by_hour": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.HourCountDTO"
+                    }
                 }
             }
         },
@@ -1184,6 +1472,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "restaurant_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.UpdateAdminUserRequest": {
+            "type": "object",
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }
