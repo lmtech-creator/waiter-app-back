@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/waiter/back/domain/entity"
@@ -25,7 +26,7 @@ func (r *FeedbackRepo) AvgScoreByHour(restaurantID string, since, until time.Tim
 	err := r.db.Model(&entity.Feedback{}).
 		Joins("JOIN tables ON tables.id = feedbacks.table_id").
 		Where("tables.restaurant_id = ? AND feedbacks.created_at BETWEEN ? AND ?", restaurantID, since, until).
-		Select("EXTRACT(HOUR FROM feedbacks.created_at)::int AS hour, AVG(feedbacks.score) AS avg_score").
+		Select(fmt.Sprintf("EXTRACT(HOUR FROM feedbacks.created_at AT TIME ZONE '%s')::int AS hour, AVG(feedbacks.score) AS avg_score", reportTimezone)).
 		Group("hour").
 		Order("hour").
 		Scan(&results).Error

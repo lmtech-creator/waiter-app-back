@@ -1,6 +1,7 @@
 package persistence
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/waiter/back/domain/entity"
@@ -81,7 +82,7 @@ func (r *RequestRepo) UsageByHour(restaurantID string, since, until time.Time) (
 	err := r.db.Model(&entity.Request{}).
 		Joins("JOIN tables ON tables.id = requests.table_id").
 		Where("tables.restaurant_id = ? AND requests.created_at BETWEEN ? AND ?", restaurantID, since, until).
-		Select("EXTRACT(HOUR FROM requests.created_at)::int AS hour, COUNT(*) AS count").
+		Select(fmt.Sprintf("EXTRACT(HOUR FROM requests.created_at AT TIME ZONE '%s')::int AS hour, COUNT(*) AS count", reportTimezone)).
 		Group("hour").
 		Order("hour").
 		Scan(&results).Error
