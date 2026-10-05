@@ -1,13 +1,14 @@
 # Build stage
-FROM golang:1.25-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 WORKDIR /app
 
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Install swag CLI to regenerate docs during build
-RUN go install github.com/swaggo/swag/cmd/swag@latest
+# Install the swag CLI pinned to the version required in go.mod, so the docs
+# generated at build time match the ones committed under docs/
+RUN go install github.com/swaggo/swag/cmd/swag@v1.16.6
 
 COPY . .
 
@@ -17,7 +18,7 @@ RUN swag init -g cmd/server/main.go -o docs
 RUN CGO_ENABLED=0 GOOS=linux go build -o /server ./cmd/server
 
 # Runtime stage
-FROM alpine:3.20
+FROM alpine:3.22
 
 RUN apk add --no-cache tzdata
 WORKDIR /app
