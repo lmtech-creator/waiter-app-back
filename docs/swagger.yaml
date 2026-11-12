@@ -185,6 +185,8 @@ definitions:
     type: object
   dto.TablePublic:
     properties:
+      id:
+        type: string
       number:
         type: integer
     type: object

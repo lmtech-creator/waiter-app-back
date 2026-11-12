@@ -1457,6 +1457,9 @@ const docTemplate = `{
         "dto.TablePublic": {
             "type": "object",
             "properties": {
+                "id": {
+                    "type": "string"
+                },
                 "number": {
                     "type": "integer"
                 }

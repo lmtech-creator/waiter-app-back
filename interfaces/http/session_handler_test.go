@@ -50,6 +50,9 @@ func TestSessionHandler_Create_Success(t *testing.T) {
 	if resp.SessionToken == "" {
 		t.Error("expected non-empty session token")
 	}
+	if resp.Table.ID != "t1" {
+		t.Errorf("expected table id t1, got %q", resp.Table.ID)
+	}
 	if resp.Table.Number != 5 {
 		t.Errorf("expected table number 5, got %d", resp.Table.Number)
 	}

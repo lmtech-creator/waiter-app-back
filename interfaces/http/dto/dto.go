@@ -19,7 +19,8 @@ type SessionResponse struct {
 }
 
 type TablePublic struct {
-	Number int `json:"number"`
+	ID     string `json:"id"`
+	Number int    `json:"number"`
 }
 
 type CreateRestaurantRequest struct {

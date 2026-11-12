@@ -86,6 +86,6 @@ func (h *SessionHandler) Create(c *gin.Context) {
 
 	c.JSON(http.StatusOK, dto.SessionResponse{
 		SessionToken: token,
-		Table:        dto.TablePublic{Number: table.Number},
+		Table:        dto.TablePublic{ID: table.ID, Number: table.Number},
 	})
 }
