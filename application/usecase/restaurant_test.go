@@ -381,3 +381,38 @@ func TestActivateTable_RepoError(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestDeleteTable_Success(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1", IsActive: true}
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	if err := uc.DeleteTable("r1", "t1"); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if _, ok := tableRepo.Tables["t1"]; ok {
+		t.Fatal("expected table to be deleted")
+	}
+}
+
+func TestDeleteTable_NotFound(t *testing.T) {
+	uc := NewRestaurantUseCase(mocks.NewRestaurantRepo(), mocks.NewTableRepo())
+
+	err := uc.DeleteTable("r1", "missing")
+	if !errors.Is(err, ErrTableNotFound) {
+		t.Fatalf("expected ErrTableNotFound, got %v", err)
+	}
+}
+
+func TestDeleteTable_RestaurantMismatch(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	tableRepo := mocks.NewTableRepo()
+	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r2", IsActive: true}
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+
+	err := uc.DeleteTable("r1", "t1")
+	if !errors.Is(err, ErrTableRestaurantMismatch) {
+		t.Fatalf("expected ErrTableRestaurantMismatch, got %v", err)
+	}
+}

@@ -290,3 +290,59 @@ func TestRequestHandler_Create_InvalidType(t *testing.T) {
 		t.Errorf("expected 400, got %d", w.Code)
 	}
 }
+
+func TestRequestHandler_GetStatus_Success(t *testing.T) {
+	handler, requestRepo, _, _ := setupRequestRouter()
+	requestRepo.Requests["req1"] = &entity.Request{ID: "req1", TableID: "t1", Status: entity.Done}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/requests/req1", nil)
+	c.Params = gin.Params{{Key: "requestId", Value: "req1"}}
+	injectClaims(c, "t1", "r1", 1)
+
+	handler.GetStatus(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp dto.RequestResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.Status != entity.Done {
+		t.Errorf("expected DONE, got %s", resp.Status)
+	}
+}
+
+func TestRequestHandler_GetStatus_OtherTableIsNotFound(t *testing.T) {
+	handler, requestRepo, _, _ := setupRequestRouter()
+	requestRepo.Requests["req1"] = &entity.Request{ID: "req1", TableID: "t2", Status: entity.Done}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/requests/req1", nil)
+	c.Params = gin.Params{{Key: "requestId", Value: "req1"}}
+	injectClaims(c, "t1", "r1", 1)
+
+	handler.GetStatus(c)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestRequestHandler_GetStatus_NoClaims(t *testing.T) {
+	handler, _, _, _ := setupRequestRouter()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/requests/req1", nil)
+	c.Params = gin.Params{{Key: "requestId", Value: "req1"}}
+
+	handler.GetStatus(c)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", w.Code)
+	}
+}

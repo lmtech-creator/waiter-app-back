@@ -53,6 +53,10 @@ func (r *TableRepo) UpdateQRCode(id, qrCode string) error {
 	return r.db.Model(&entity.Table{}).Where("id = ?", id).Update("qr_code", qrCode).Error
 }
 
+func (r *TableRepo) DeleteByID(id string) error {
+	return r.db.Delete(&entity.Table{}, "id = ?", id).Error
+}
+
 func (r *TableRepo) InactiveTable(id string) error {
 	return r.db.Model(&entity.Table{}).Where("id = ?", id).Update("is_active", false).Error
 }

@@ -166,3 +166,30 @@ func (h *RequestHandler) GetTableStatus(c *gin.Context) {
 
 	c.JSON(http.StatusOK, dto.ToRequestListResponse(requests))
 }
+
+// GetStatus godoc
+// @Summary      Obtener estado de una solicitud
+// @Description  Retorna una solicitud de la mesa de la sesión; el cliente lo usa para saber cuándo fue atendida.
+// @Tags         requests
+// @Produce      json
+// @Param        requestId  path      string  true  "ID de la solicitud"
+// @Success      200        {object}  dto.RequestResponse
+// @Failure      401        {object}  map[string]string
+// @Failure      404        {object}  dto.ErrorResponse
+// @Security     SessionToken
+// @Router       /api/v1/requests/{requestId} [get]
+func (h *RequestHandler) GetStatus(c *gin.Context) {
+	claims := mw.GetClaims(c)
+	if claims == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "No autorizado."})
+		return
+	}
+
+	request, err := h.uc.GetRequestForTable(claims.TableID, c.Param("requestId"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "not_found", Message: "Solicitud no encontrada."})
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.ToRequestResponse(request))
+}

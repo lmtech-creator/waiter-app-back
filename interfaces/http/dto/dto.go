@@ -63,6 +63,7 @@ type TableResponse struct {
 	Number       int    `json:"number"`
 	RestaurantID string `json:"restaurant_id"`
 	QRCode       string `json:"qr_code"`
+	IsActive     bool   `json:"is_active"`
 }
 
 type RequestResponse struct {
@@ -163,6 +164,7 @@ func ToTableResponse(t *entity.Table) TableResponse {
 		Number:       t.Number,
 		RestaurantID: t.RestaurantID,
 		QRCode:       t.QRCode,
+		IsActive:     t.IsActive,
 	}
 }
 

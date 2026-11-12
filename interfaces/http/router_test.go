@@ -82,6 +82,7 @@ func TestSetupRouter_RoutesExist(t *testing.T) {
 	expectedPaths := map[string]string{
 		"POST:/api/v1/session":                                         "",
 		"POST:/api/v1/requests":                                        "",
+		"GET:/api/v1/requests/:requestId":                              "",
 		"GET:/api/v1/tables/:tableId/status":                           "",
 		"POST:/api/v1/feedback":                                        "",
 		"GET:/api/v1/restaurants/:restaurantId/requests/active":        "",
@@ -94,6 +95,7 @@ func TestSetupRouter_RoutesExist(t *testing.T) {
 		"GET:/api/v1/restaurants/:restaurantId/tables":                 "",
 		"POST:/api/v1/restaurants/:restaurantId/tables/:id/inactivate": "",
 		"POST:/api/v1/restaurants/:restaurantId/tables/:id/activate":   "",
+		"DELETE:/api/v1/restaurants/:restaurantId/tables/:id":          "",
 		"POST:/api/v1/admin/tables/:id/regenerate-qr":                  "",
 		"POST:/api/v1/admin/login":                                     "",
 		"POST:/api/v1/admin/users":                                      "",

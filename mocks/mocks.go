@@ -63,6 +63,7 @@ type TableRepo struct {
 	UpdateQRCodeFn              func(id, qrCode string) error
 	InactiveTableFn             func(id string) error
 	ReactiVateTableFn           func(id string) error
+	DeleteByIDFn                func(id string) error
 }
 
 func NewTableRepo() *TableRepo {
@@ -165,6 +166,19 @@ func (m *TableRepo) ReactiVateTable(id string) error {
 	return nil
 }
 
+func (m *TableRepo) DeleteByID(id string) error {
+	if m.DeleteByIDFn != nil {
+		return m.DeleteByIDFn(id)
+	}
+
+	if _, ok := m.Tables[id]; !ok {
+		return fmt.Errorf("table not found")
+	}
+
+	delete(m.Tables, id)
+	return nil
+}
+
 // --- RequestRepository Mock ---
 
 type RequestRepo struct {
@@ -178,7 +192,7 @@ type RequestRepo struct {
 	UpdateCompletedAtFn         func(id string, t time.Time) error
 	CountServedTablesFn         func(restaurantID string, since, until time.Time) (int, error)
 	AvgServiceTimeFn            func(restaurantID string, since, until time.Time) (float64, error)
-	UsageByHourFn               func(restaurantID string, since, until time.Time) ([]repository.HourCount, error)
+	UsageByHourFn               func(restaurantID string, since, until time.Time) ([]repository.HourBucket, error)
 }
 
 func NewRequestRepo() *RequestRepo {
@@ -268,7 +282,7 @@ func (m *RequestRepo) AvgServiceTime(restaurantID string, since, until time.Time
 	return 0, nil
 }
 
-func (m *RequestRepo) UsageByHour(restaurantID string, since, until time.Time) ([]repository.HourCount, error) {
+func (m *RequestRepo) UsageByHour(restaurantID string, since, until time.Time) ([]repository.HourBucket, error) {
 	if m.UsageByHourFn != nil {
 		return m.UsageByHourFn(restaurantID, since, until)
 	}
@@ -300,7 +314,7 @@ type FeedbackRepo struct {
 	CreateFn        func(f *entity.Feedback) error
 	FindByTableFn   func(tableID string) ([]entity.Feedback, error)
 	FindByRIDFn     func(restaurantID string) ([]entity.Feedback, error)
-	AvgScoreByHourFn func(restaurantID string, since, until time.Time) ([]repository.HourScore, error)
+	AvgScoreByHourFn func(restaurantID string, since, until time.Time) ([]repository.ScoreBucket, error)
 }
 
 func NewFeedbackRepo() *FeedbackRepo {
@@ -315,7 +329,7 @@ func (m *FeedbackRepo) Create(f *entity.Feedback) error {
 	return nil
 }
 
-func (m *FeedbackRepo) AvgScoreByHour(restaurantID string, since, until time.Time) ([]repository.HourScore, error) {
+func (m *FeedbackRepo) AvgScoreByHour(restaurantID string, since, until time.Time) ([]repository.ScoreBucket, error) {
 	if m.AvgScoreByHourFn != nil {
 		return m.AvgScoreByHourFn(restaurantID, since, until)
 	}

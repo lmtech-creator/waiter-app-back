@@ -1,7 +1,6 @@
 package persistence
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/waiter/back/domain/entity"
@@ -21,14 +20,16 @@ func (r *FeedbackRepo) Create(feedback *entity.Feedback) error {
 	return r.db.Create(feedback).Error
 }
 
-func (r *FeedbackRepo) AvgScoreByHour(restaurantID string, since, until time.Time) ([]repository.HourScore, error) {
-	var results []repository.HourScore
+func (r *FeedbackRepo) AvgScoreByHour(restaurantID string, since, until time.Time) ([]repository.ScoreBucket, error) {
+	var results []repository.ScoreBucket
+	// Same UTC-epoch bucketing as UsageByHour; SUM + COUNT let the use case
+	// compute a weighted average after merging into local hours.
 	err := r.db.Model(&entity.Feedback{}).
 		Joins("JOIN tables ON tables.id = feedbacks.table_id").
 		Where("tables.restaurant_id = ? AND feedbacks.created_at BETWEEN ? AND ?", restaurantID, since, until).
-		Select(fmt.Sprintf("EXTRACT(HOUR FROM feedbacks.created_at AT TIME ZONE '%s')::int AS hour, AVG(feedbacks.score) AS avg_score", reportTimezone)).
-		Group("hour").
-		Order("hour").
+		Select("to_timestamp(floor((EXTRACT(EPOCH FROM feedbacks.created_at))::double precision / 3600) * 3600) AS start, SUM(feedbacks.score)::double precision AS score_sum, COUNT(*) AS count").
+		Group("start").
+		Order("start").
 		Scan(&results).Error
 	return results, err
 }

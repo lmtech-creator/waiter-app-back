@@ -23,11 +23,14 @@ func TestToRestaurantResponse(t *testing.T) {
 }
 
 func TestToTableResponse(t *testing.T) {
-	tbl := &entity.Table{ID: "t1", Number: 5, RestaurantID: "r1", QRCode: "qr-123"}
+	tbl := &entity.Table{ID: "t1", Number: 5, RestaurantID: "r1", QRCode: "qr-123", IsActive: true}
 	resp := ToTableResponse(tbl)
 
 	if resp.ID != "t1" || resp.Number != 5 || resp.RestaurantID != "r1" || resp.QRCode != "qr-123" {
 		t.Errorf("unexpected table response: %+v", resp)
+	}
+	if !resp.IsActive {
+		t.Error("expected is_active to be forwarded")
 	}
 }
 

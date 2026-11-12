@@ -51,6 +51,7 @@ func SetupRouter(
 	customer.Use(mw.AuthMiddleware(secret))
 	{
 		customer.POST("/requests", requestHandler.Create)
+		customer.GET("/requests/:requestId", requestHandler.GetStatus)
 	}
 
 	// Public admin auth
@@ -94,6 +95,7 @@ func SetupRouter(
 			ownerOrAbove.GET("/restaurants/:restaurantId/tables", restaurantHandler.GetTables)
 			ownerOrAbove.POST("/restaurants/:restaurantId/tables/:id/inactivate", restaurantHandler.InactivateTable)
 			ownerOrAbove.POST("/restaurants/:restaurantId/tables/:id/activate", restaurantHandler.ActivateTable)
+			ownerOrAbove.DELETE("/restaurants/:restaurantId/tables/:id", restaurantHandler.DeleteTable)
 			ownerOrAbove.POST("/admin/tables/:id/regenerate-qr", restaurantHandler.RegenerateQR)
 			ownerOrAbove.GET("/restaurants/:restaurantId/feedback", feedbackHandler.GetByRestaurant)
 			ownerOrAbove.GET("/restaurants/:restaurantId/stats", statsHandler.Get)

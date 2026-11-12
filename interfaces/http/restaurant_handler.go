@@ -251,3 +251,36 @@ func (h *RestaurantHandler) ActivateTable(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"table_id": tableID, "is_active": true})
 }
+
+// DeleteTable godoc
+// @Summary      Eliminar mesa
+// @Description  Elimina una mesa del restaurante. La operación es irreversible.
+// @Tags         tables
+// @Produce      json
+// @Param        restaurantId  path      string  true  "ID del restaurante"
+// @Param        id            path      string  true  "ID de la mesa"
+// @Success      200           {object}  map[string]any
+// @Failure      403           {object}  dto.ErrorResponse
+// @Failure      404           {object}  dto.ErrorResponse
+// @Failure      500           {object}  dto.ErrorResponse
+// @Security     AdminToken
+// @Router       /api/v1/restaurants/{restaurantId}/tables/{id} [delete]
+func (h *RestaurantHandler) DeleteTable(c *gin.Context) {
+	restaurantID := c.Param("restaurantId")
+	tableID := c.Param("id")
+
+	err := h.uc.DeleteTable(restaurantID, tableID)
+	if err != nil {
+		switch {
+		case errors.Is(err, usecase.ErrTableNotFound):
+			c.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "not_found", Message: "Mesa no encontrada."})
+		case errors.Is(err, usecase.ErrTableRestaurantMismatch):
+			c.JSON(http.StatusForbidden, dto.ErrorResponse{Error: "forbidden", Message: "La mesa no pertenece al restaurante."})
+		default:
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "internal_error", Message: "No se pudo eliminar la mesa."})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"table_id": tableID, "deleted": true})
+}

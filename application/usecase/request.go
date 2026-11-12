@@ -124,3 +124,17 @@ func (uc *RequestUseCase) CompleteRequest(id string) error {
 func (uc *RequestUseCase) GetTableStatus(tableID string) ([]entity.Request, error) {
 	return uc.requestRepo.FindByTableID(tableID)
 }
+
+// GetRequestForTable returns a single request only when it belongs to the given
+// table. Customer sessions poll this to learn when their bill request has been
+// marked as attended, without being able to read another table's activity.
+func (uc *RequestUseCase) GetRequestForTable(tableID, requestID string) (*entity.Request, error) {
+	req, err := uc.requestRepo.FindByID(requestID)
+	if err != nil {
+		return nil, fmt.Errorf("request not found: %w", err)
+	}
+	if req.TableID != tableID {
+		return nil, fmt.Errorf("request not found")
+	}
+	return req, nil
+}

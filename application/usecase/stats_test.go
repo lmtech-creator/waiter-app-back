@@ -20,11 +20,12 @@ func TestStatsUseCase_GetStats_Valid(t *testing.T) {
 	rr.AvgServiceTimeFn = func(rid string, s, u time.Time) (float64, error) {
 		return 15.5, nil
 	}
-	rr.UsageByHourFn = func(rid string, s, u time.Time) ([]repository.HourCount, error) {
-		return []repository.HourCount{{Hour: 14, Count: 10}}, nil
+	rr.UsageByHourFn = func(rid string, s, u time.Time) ([]repository.HourBucket, error) {
+		// 17:00 UTC is 14:00 in Buenos Aires (UTC-3).
+		return []repository.HourBucket{{Start: time.Date(2026, 1, 1, 17, 0, 0, 0, time.UTC), Count: 10}}, nil
 	}
-	fr.AvgScoreByHourFn = func(rid string, s, u time.Time) ([]repository.HourScore, error) {
-		return []repository.HourScore{{Hour: 14, AvgScore: 4.5}}, nil
+	fr.AvgScoreByHourFn = func(rid string, s, u time.Time) ([]repository.ScoreBucket, error) {
+		return []repository.ScoreBucket{{Start: time.Date(2026, 1, 1, 17, 0, 0, 0, time.UTC), ScoreSum: 45, Count: 10}}, nil
 	}
 
 	uc := NewStatsUseCase(rr, fr)
@@ -96,4 +97,35 @@ func TestStatsUseCase_GetStats_RepoError(t *testing.T) {
 
 	_, err := uc.GetStats("rest-1", since, until)
 	require.Error(t, err)
+}
+
+// Regression: a 20:00 Buenos Aires request is 23:00 UTC, and it must be
+// reported as hour 20, never 23 (UTC) nor 17 (double shift).
+func TestUsageByLocalHour_UsesBuenosAiresOffset(t *testing.T) {
+	buckets := []repository.HourBucket{
+		{Start: time.Date(2026, 11, 12, 23, 0, 0, 0, time.UTC), Count: 3},
+		{Start: time.Date(2026, 11, 13, 23, 0, 0, 0, time.UTC), Count: 2},
+		{Start: time.Date(2026, 11, 12, 17, 0, 0, 0, time.UTC), Count: 1},
+	}
+
+	require.Equal(t, []repository.HourCount{
+		{Hour: 14, Count: 1},
+		{Hour: 20, Count: 5},
+	}, usageByLocalHour(buckets))
+}
+
+func TestScoresByLocalHour_MergesDaysWithWeightedAverage(t *testing.T) {
+	buckets := []repository.ScoreBucket{
+		{Start: time.Date(2026, 11, 12, 23, 0, 0, 0, time.UTC), ScoreSum: 10, Count: 2},
+		{Start: time.Date(2026, 11, 13, 23, 0, 0, 0, time.UTC), ScoreSum: 12, Count: 3},
+	}
+
+	require.Equal(t, []repository.HourScore{
+		{Hour: 20, AvgScore: 4.4},
+	}, scoresByLocalHour(buckets))
+}
+
+func TestUsageByLocalHour_Empty(t *testing.T) {
+	require.Empty(t, usageByLocalHour(nil))
+	require.Empty(t, scoresByLocalHour(nil))
 }

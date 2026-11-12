@@ -1,7 +1,6 @@
 package persistence
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/waiter/back/domain/entity"
@@ -77,14 +76,17 @@ func (r *RequestRepo) AvgServiceTime(restaurantID string, since, until time.Time
 	return avg, err
 }
 
-func (r *RequestRepo) UsageByHour(restaurantID string, since, until time.Time) ([]repository.HourCount, error) {
-	var results []repository.HourCount
+func (r *RequestRepo) UsageByHour(restaurantID string, since, until time.Time) ([]repository.HourBucket, error) {
+	var results []repository.HourBucket
+	// Bucket on the absolute UTC hour (epoch floor) instead of relying on
+	// EXTRACT(HOUR ... AT TIME ZONE ...): the epoch form does not depend on the
+	// Postgres session timezone, and the local-hour conversion happens in Go.
 	err := r.db.Model(&entity.Request{}).
 		Joins("JOIN tables ON tables.id = requests.table_id").
 		Where("tables.restaurant_id = ? AND requests.created_at BETWEEN ? AND ?", restaurantID, since, until).
-		Select(fmt.Sprintf("EXTRACT(HOUR FROM requests.created_at AT TIME ZONE '%s')::int AS hour, COUNT(*) AS count", reportTimezone)).
-		Group("hour").
-		Order("hour").
+		Select("to_timestamp(floor((EXTRACT(EPOCH FROM requests.created_at))::double precision / 3600) * 3600) AS start, COUNT(*) AS count").
+		Group("start").
+		Order("start").
 		Scan(&results).Error
 	return results, err
 }

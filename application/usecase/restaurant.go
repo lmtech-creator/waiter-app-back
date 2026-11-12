@@ -184,3 +184,17 @@ func (uc *RestaurantUseCase) ActivateTable(restaurantID, tableID string) error {
 	}
 	return nil
 }
+
+func (uc *RestaurantUseCase) DeleteTable(restaurantID, tableID string) error {
+	t, err := uc.tableRepo.FindByID(tableID)
+	if err != nil {
+		return ErrTableNotFound
+	}
+	if t.RestaurantID != restaurantID {
+		return ErrTableRestaurantMismatch
+	}
+	if err := uc.tableRepo.DeleteByID(tableID); err != nil {
+		return fmt.Errorf("failed to delete table: %w", err)
+	}
+	return nil
+}

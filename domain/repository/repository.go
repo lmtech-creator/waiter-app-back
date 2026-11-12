@@ -21,16 +21,37 @@ type TableRepository interface {
 	InactiveTable(id string) error
 	ReactiVateTable(id string) error
 	UpdateQRCode(id, qrCode string) error
+	DeleteByID(id string) error
 }
 
+// HourCount is an aggregate bucket already expressed in the restaurant's
+// reporting hour-of-day (UTC-3).
 type HourCount struct {
 	Hour  int
 	Count int
 }
 
+// HourScore is an average score bucket already expressed in the restaurant's
+// reporting hour-of-day (UTC-3).
 type HourScore struct {
 	Hour     int
 	AvgScore float64
+}
+
+// HourBucket is a raw UTC hour bucket returned by the database. The use case
+// converts it to the restaurant's local hour so the offset never depends on the
+// Postgres session timezone.
+type HourBucket struct {
+	Start time.Time
+	Count int
+}
+
+// ScoreBucket is a raw UTC hour bucket with the sum and count needed to compute
+// a weighted average after merging buckets into local hours.
+type ScoreBucket struct {
+	Start    time.Time
+	ScoreSum float64
+	Count    int
 }
 
 type RequestRepository interface {
@@ -43,14 +64,14 @@ type RequestRepository interface {
 	UpdateCompletedAt(id string, t time.Time) error
 	CountServedTables(restaurantID string, since, until time.Time) (int, error)
 	AvgServiceTime(restaurantID string, since, until time.Time) (float64, error)
-	UsageByHour(restaurantID string, since, until time.Time) ([]HourCount, error)
+	UsageByHour(restaurantID string, since, until time.Time) ([]HourBucket, error)
 }
 
 type FeedbackRepository interface {
 	Create(feedback *entity.Feedback) error
 	FindByTableID(tableID string) ([]entity.Feedback, error)
 	FindByRestaurantID(restaurantID string) ([]entity.Feedback, error)
-	AvgScoreByHour(restaurantID string, since, until time.Time) ([]HourScore, error)
+	AvgScoreByHour(restaurantID string, since, until time.Time) ([]ScoreBucket, error)
 }
 
 type AdminRepository interface {

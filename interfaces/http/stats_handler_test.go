@@ -32,11 +32,11 @@ func TestStatsHandler_Get_Success(t *testing.T) {
 	rr.AvgServiceTimeFn = func(rid string, s, u time.Time) (float64, error) {
 		return 15.5, nil
 	}
-	rr.UsageByHourFn = func(rid string, s, u time.Time) ([]repository.HourCount, error) {
-		return []repository.HourCount{{Hour: 14, Count: 10}}, nil
+	rr.UsageByHourFn = func(rid string, s, u time.Time) ([]repository.HourBucket, error) {
+		return []repository.HourBucket{{Start: time.Date(2026, 1, 1, 17, 0, 0, 0, time.UTC), Count: 10}}, nil
 	}
-	fr.AvgScoreByHourFn = func(rid string, s, u time.Time) ([]repository.HourScore, error) {
-		return []repository.HourScore{{Hour: 14, AvgScore: 4.5}}, nil
+	fr.AvgScoreByHourFn = func(rid string, s, u time.Time) ([]repository.ScoreBucket, error) {
+		return []repository.ScoreBucket{{Start: time.Date(2026, 1, 1, 17, 0, 0, 0, time.UTC), ScoreSum: 45, Count: 10}}, nil
 	}
 
 	w := httptest.NewRecorder()
