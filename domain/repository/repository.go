@@ -32,10 +32,12 @@ type HourCount struct {
 }
 
 // HourScore is an average score bucket already expressed in the restaurant's
-// reporting hour-of-day (UTC-3).
+// reporting hour-of-day (UTC-3). Count is the number of ratings behind the
+// average, so callers can compute a weighted overall score.
 type HourScore struct {
 	Hour     int
 	AvgScore float64
+	Count    int
 }
 
 // HourBucket is a raw UTC hour bucket returned by the database. The use case

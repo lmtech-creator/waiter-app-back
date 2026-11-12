@@ -42,6 +42,7 @@ func TestStatsUseCase_GetStats_Valid(t *testing.T) {
 	require.Len(t, stats.ScoreByHour, 1)
 	require.Equal(t, 14, stats.ScoreByHour[0].Hour)
 	require.Equal(t, 4.5, stats.ScoreByHour[0].AvgScore)
+	require.Equal(t, 10, stats.ScoreByHour[0].Count)
 }
 
 func TestStatsUseCase_GetStats_NoData(t *testing.T) {
@@ -121,7 +122,7 @@ func TestScoresByLocalHour_MergesDaysWithWeightedAverage(t *testing.T) {
 	}
 
 	require.Equal(t, []repository.HourScore{
-		{Hour: 20, AvgScore: 4.4},
+		{Hour: 20, AvgScore: 4.4, Count: 5},
 	}, scoresByLocalHour(buckets))
 }
 

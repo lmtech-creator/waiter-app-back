@@ -102,6 +102,7 @@ func scoresByLocalHour(buckets []repository.ScoreBucket) []repository.HourScore 
 		result = append(result, repository.HourScore{
 			Hour:     hour,
 			AvgScore: sums[hour] / float64(count),
+			Count:    count,
 		})
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].Hour < result[j].Hour })

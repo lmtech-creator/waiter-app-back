@@ -131,8 +131,9 @@ type HourCountDTO struct {
 }
 
 type HourScoreDTO struct {
-	Hour     int     `json:"hour"`
-	AvgScore float64 `json:"avg_score"`
+	Hour          int     `json:"hour"`
+	AvgScore      float64 `json:"avg_score"`
+	FeedbackCount int     `json:"feedback_count"`
 }
 
 type StatsResponse struct {
@@ -230,7 +231,7 @@ func ToStatsResponse(s *usecase.RestaurantStats) StatsResponse {
 	}
 	scores := make([]HourScoreDTO, len(s.ScoreByHour))
 	for i, h := range s.ScoreByHour {
-		scores[i] = HourScoreDTO{Hour: h.Hour, AvgScore: h.AvgScore}
+		scores[i] = HourScoreDTO{Hour: h.Hour, AvgScore: h.AvgScore, FeedbackCount: h.Count}
 	}
 	return StatsResponse{
 		TotalTablesServed: s.TotalTablesServed,

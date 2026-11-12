@@ -1353,6 +1353,9 @@ const docTemplate = `{
                 "avg_score": {
                     "type": "number"
                 },
+                "feedback_count": {
+                    "type": "integer"
+                },
                 "hour": {
                     "type": "integer"
                 }

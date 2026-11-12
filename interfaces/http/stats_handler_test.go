@@ -66,6 +66,9 @@ func TestStatsHandler_Get_Success(t *testing.T) {
 	if len(resp.ScoreByHour) != 1 || resp.ScoreByHour[0].Hour != 14 {
 		t.Errorf("expected 1 score entry for hour 14")
 	}
+	if resp.ScoreByHour[0].FeedbackCount != 10 {
+		t.Errorf("expected 10 feedback ratings, got %d", resp.ScoreByHour[0].FeedbackCount)
+	}
 }
 
 func TestStatsHandler_Get_MissingSince(t *testing.T) {
