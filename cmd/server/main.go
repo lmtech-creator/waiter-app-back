@@ -53,6 +53,7 @@ func main() {
 	}
 
 	// Repositories
+	planRepo := persistence.NewPlanRepo(db)
 	restaurantRepo := persistence.NewRestaurantRepo(db)
 	tableRepo := persistence.NewTableRepo(db)
 	requestRepo := persistence.NewRequestRepo(db)
@@ -65,11 +66,12 @@ func main() {
 	// Use cases
 	requestUC := usecase.NewRequestUseCase(requestRepo, tableRepo, hub)
 	feedbackUC := usecase.NewFeedbackUseCase(feedbackRepo, tableRepo)
-	restaurantUC := usecase.NewRestaurantUseCase(restaurantRepo, tableRepo)
+	restaurantUC := usecase.NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
+	planUC := usecase.NewPlanUseCase(planRepo)
 	adminUC := usecase.NewAdminUseCase(adminRepo, adminSecret)
 	statsUC := usecase.NewStatsUseCase(requestRepo, feedbackRepo)
 
-	// Seed superadmin on first run.
+	// Seed superadmin and default plan on first run.
 	if seeded, username, password, err := usecase.SeedAdminIfNeeded(adminRepo); err != nil {
 		zap.L().Error("failed to seed admin user", zap.Error(err))
 	} else if seeded {
@@ -77,6 +79,9 @@ func main() {
 			zap.String("username", username),
 			zap.String("password", password),
 		)
+	}
+	if _, err := planUC.EnsureDefaultPlan(); err != nil {
+		zap.L().Error("failed to ensure default plan", zap.Error(err))
 	}
 
 	// Handlers
@@ -86,12 +91,13 @@ func main() {
 	sessionHandler := handler.NewSessionHandler(tableRepo, secret)
 	adminHandler := handler.NewAdminHandler(adminUC)
 	statsHandler := handler.NewStatsHandler(statsUC)
+	planHandler := handler.NewPlanHandler(planUC)
 
 	// Background tasks
 	go mw.StartLimiterCleanup()
 
 	// Router
-	router := handler.SetupRouter(requestHandler, feedbackHandler, restaurantHandler, sessionHandler, adminHandler, statsHandler, hub, secret, adminSecret)
+	router := handler.SetupRouter(requestHandler, feedbackHandler, restaurantHandler, sessionHandler, adminHandler, statsHandler, planHandler, hub, secret, adminSecret)
 
 	zap.L().Info("server starting", zap.String("port", cfg.Port))
 	if err := router.Run(":" + cfg.Port); err != nil {

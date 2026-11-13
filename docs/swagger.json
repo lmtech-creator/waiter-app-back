@@ -396,6 +396,232 @@
                 }
             }
         },
+        "/api/v1/plans": {
+            "get": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
+                "description": "Retorna todos los planes configurables (solo superadmin)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "restaurants"
+                ],
+                "summary": "Listar planes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/dto.PlanResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
+                "description": "Crea un nuevo plan configurable (solo superadmin)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "restaurants"
+                ],
+                "summary": "Crear plan",
+                "parameters": [
+                    {
+                        "description": "Datos del plan",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.CreatePlanRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PlanResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/plans/{planId}": {
+            "get": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
+                "description": "Retorna un plan por su ID (solo superadmin)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "restaurants"
+                ],
+                "summary": "Obtener plan",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del plan",
+                        "name": "planId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PlanResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
+                "description": "Elimina un plan configurable si no está en uso (solo superadmin)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "restaurants"
+                ],
+                "summary": "Eliminar plan",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del plan",
+                        "name": "planId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Plan eliminado"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
+                "description": "Actualiza un plan configurable (solo superadmin)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "restaurants"
+                ],
+                "summary": "Actualizar plan",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del plan",
+                        "name": "planId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Datos a actualizar",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.UpdatePlanRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.PlanResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/requests": {
             "post": {
                 "security": [
@@ -470,6 +696,53 @@
             }
         },
         "/api/v1/requests/{requestId}": {
+            "get": {
+                "security": [
+                    {
+                        "SessionToken": []
+                    }
+                ],
+                "description": "Retorna una solicitud de la mesa de la sesión; el cliente lo usa para saber cuándo fue atendida.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "requests"
+                ],
+                "summary": "Obtener estado de una solicitud",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID de la solicitud",
+                        "name": "requestId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/dto.RequestResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "patch": {
                 "security": [
                     {
@@ -898,6 +1171,66 @@
                 }
             }
         },
+        "/api/v1/restaurants/{restaurantId}/tables/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "AdminToken": []
+                    }
+                ],
+                "description": "Elimina una mesa del restaurante. La operación es irreversible.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tables"
+                ],
+                "summary": "Eliminar mesa",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del restaurante",
+                        "name": "restaurantId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "ID de la mesa",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/restaurants/{restaurantId}/tables/{id}/activate": {
             "post": {
                 "security": [
@@ -1251,6 +1584,20 @@
                 }
             }
         },
+        "dto.CreatePlanRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.CreateRequestRequest": {
             "type": "object",
             "required": [
@@ -1272,6 +1619,9 @@
                     "type": "string"
                 },
                 "plan": {
+                    "type": "string"
+                },
+                "plan_id": {
                     "type": "string"
                 },
                 "qr_banner_text": {
@@ -1355,6 +1705,20 @@
                 }
             }
         },
+        "dto.PlanResponse": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "dto.RequestResponse": {
             "type": "object",
             "properties": {
@@ -1393,6 +1757,9 @@
                     "type": "string"
                 },
                 "plan": {
+                    "type": "string"
+                },
+                "plan_id": {
                     "type": "string"
                 },
                 "qr_banner_text": {
@@ -1465,6 +1832,9 @@
                 "id": {
                     "type": "string"
                 },
+                "is_active": {
+                    "type": "boolean"
+                },
                 "number": {
                     "type": "integer"
                 },
@@ -1483,6 +1853,17 @@
                     "type": "string"
                 },
                 "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.UpdatePlanRequest": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "name": {
                     "type": "string"
                 }
             }

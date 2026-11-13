@@ -20,10 +20,15 @@ var routerAdminSecret = []byte("admin-test-secret-32bytes-enough")
 
 func makeRouterAdminToken(t *testing.T) string {
 	t.Helper()
+	return makeRouterToken(t, entity.RoleSuperAdmin, "r1")
+}
+
+func makeRouterToken(t *testing.T, role entity.AdminRole, restaurantID string) string {
+	t.Helper()
 	claims := auth.AdminClaims{
 		AdminID:      "admin-1",
-		RestaurantID: "r1",
-		Role:         string(entity.RoleSuperAdmin),
+		RestaurantID: restaurantID,
+		Role:         string(role),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 		},
@@ -46,11 +51,15 @@ func buildTestRouter(t *testing.T) *gin.Engine {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	adminRepo := mocks.NewAdminRepo()
 
+	planRepo := mocks.NewPlanRepo()
+	planRepo.Plans["plan-free"] = &entity.Plan{ID: "plan-free", Name: "free", Description: "Plan gratuito"}
+
 	requestUC := usecase.NewRequestUseCase(requestRepo, tableRepo, notifier)
 	feedbackUC := usecase.NewFeedbackUseCase(feedbackRepo, tableRepo)
-	restaurantUC := usecase.NewRestaurantUseCase(restaurantRepo, tableRepo)
+	restaurantUC := usecase.NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 	adminUC := usecase.NewAdminUseCase(adminRepo, []byte("admin-test-secret-32bytes-enough"))
 	statsUC := usecase.NewStatsUseCase(requestRepo, feedbackRepo)
+	planUC := usecase.NewPlanUseCase(planRepo)
 
 	requestHandler := NewRequestHandler(requestUC)
 	feedbackHandler := NewFeedbackHandler(feedbackUC)
@@ -58,9 +67,10 @@ func buildTestRouter(t *testing.T) *gin.Engine {
 	sessionHandler := NewSessionHandler(tableRepo, []byte("test-secret-that-is-long-enough!!"))
 	adminHandler := NewAdminHandler(adminUC)
 	statsHandler := NewStatsHandler(statsUC)
+	planHandler := NewPlanHandler(planUC)
 	hub := ws.NewHub(nil)
 
-	return SetupRouter(requestHandler, feedbackHandler, restaurantHandler, sessionHandler, adminHandler, statsHandler, hub, []byte("test-secret-that-is-long-enough!!"), []byte("admin-test-secret-32bytes-enough"))
+	return SetupRouter(requestHandler, feedbackHandler, restaurantHandler, sessionHandler, adminHandler, statsHandler, planHandler, hub, []byte("test-secret-that-is-long-enough!!"), []byte("admin-test-secret-32bytes-enough"))
 }
 
 func TestSetupRouter_HealthCheck(t *testing.T) {
@@ -103,6 +113,11 @@ func TestSetupRouter_RoutesExist(t *testing.T) {
 		"PATCH:/api/v1/admin/users/:id":                                 "",
 		"POST:/api/v1/admin/users/:id/reset-password":                   "",
 		"DELETE:/api/v1/admin/users/:id":                                "",
+		"GET:/api/v1/plans":                                             "",
+		"POST:/api/v1/plans":                                            "",
+		"GET:/api/v1/plans/:planId":                                     "",
+		"PATCH:/api/v1/plans/:planId":                                   "",
+		"DELETE:/api/v1/plans/:planId":                                  "",
 		"GET:/api/v1/ws/:restaurantId":                                 "",
 		"GET:/health":                                                  "",
 	}
@@ -114,6 +129,48 @@ func TestSetupRouter_RoutesExist(t *testing.T) {
 
 	for path := range expectedPaths {
 		t.Errorf("expected route not found: %s", path)
+	}
+}
+
+func TestSetupRouter_EmployeeReadAccess(t *testing.T) {
+	router := buildTestRouter(t)
+	employee := makeRouterToken(t, entity.RoleEmployee, "r1")
+
+	get := func(path string) int {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, path, nil)
+		req.Header.Set("Authorization", "Bearer "+employee)
+		router.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	// Waiters must be able to see tables, live requests and stats.
+	if code := get("/api/v1/restaurants/r1/tables"); code != http.StatusOK {
+		t.Errorf("employee GET tables: expected 200, got %d", code)
+	}
+	if code := get("/api/v1/restaurants/r1/requests/active"); code != http.StatusOK {
+		t.Errorf("employee GET active requests: expected 200, got %d", code)
+	}
+	if code := get("/api/v1/restaurants/r1/stats?since=2026-01-01T00:00:00Z&until=2026-01-02T00:00:00Z"); code != http.StatusOK {
+		t.Errorf("employee GET stats: expected 200, got %d", code)
+	}
+
+	// Owner-only surfaces stay forbidden.
+	if code := get("/api/v1/restaurants/r1/feedback"); code != http.StatusForbidden {
+		t.Errorf("employee GET feedback: expected 403, got %d", code)
+	}
+	if code := get("/api/v1/restaurants/r2/tables"); code != http.StatusForbidden {
+		t.Errorf("employee GET other restaurant tables: expected 403, got %d", code)
+	}
+
+	// Mutations stay owner-only.
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/restaurants/r1/tables", bytes.NewBufferString(`{"number":1}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+employee)
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Errorf("employee POST tables: expected 403, got %d", w.Code)
 	}
 }
 

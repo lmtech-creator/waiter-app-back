@@ -40,6 +40,7 @@ func (h *RestaurantHandler) Create(c *gin.Context) {
 
 	r, err := h.uc.CreateRestaurant(usecase.CreateRestaurantInput{
 		Name:          req.Name,
+		PlanID:        req.PlanID,
 		Plan:          req.Plan,
 		QrBannerText:  req.QrBannerText,
 		QrFooterItems: req.QrFooterItems,

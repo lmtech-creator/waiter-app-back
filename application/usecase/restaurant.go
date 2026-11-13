@@ -32,23 +32,51 @@ func generateQRCode(length int) (string, error) {
 type RestaurantUseCase struct {
 	restaurantRepo repository.RestaurantRepository
 	tableRepo      repository.TableRepository
+	planRepo       repository.PlanRepository
 }
 
-func NewRestaurantUseCase(rr repository.RestaurantRepository, tr repository.TableRepository) *RestaurantUseCase {
-	return &RestaurantUseCase{restaurantRepo: rr, tableRepo: tr}
+func NewRestaurantUseCase(
+	rr repository.RestaurantRepository,
+	tr repository.TableRepository,
+	pr repository.PlanRepository,
+) *RestaurantUseCase {
+	return &RestaurantUseCase{restaurantRepo: rr, tableRepo: tr, planRepo: pr}
 }
 
 type CreateRestaurantInput struct {
 	Name          string   `json:"name" binding:"required"`
+	PlanID        string   `json:"plan_id"`
 	Plan          string   `json:"plan"`
 	QrBannerText  string   `json:"qr_banner_text"`
 	QrFooterItems []string `json:"qr_footer_items"`
 }
 
+func (uc *RestaurantUseCase) resolvePlan(planID, planName string) (*entity.Plan, error) {
+	if planID != "" {
+		plan, err := uc.planRepo.FindByID(planID)
+		if err != nil {
+			return nil, ErrPlanNotFound
+		}
+		return plan, nil
+	}
+	if planName != "" {
+		plan, err := uc.planRepo.FindByName(planName)
+		if err != nil {
+			return nil, ErrPlanNotFound
+		}
+		return plan, nil
+	}
+	plan, err := uc.planRepo.FindByName("free")
+	if err != nil {
+		return nil, ErrPlanNotFound
+	}
+	return plan, nil
+}
+
 func (uc *RestaurantUseCase) CreateRestaurant(input CreateRestaurantInput) (*entity.Restaurant, error) {
-	plan := input.Plan
-	if plan == "" {
-		plan = "free"
+	plan, err := uc.resolvePlan(input.PlanID, input.Plan)
+	if err != nil {
+		return nil, err
 	}
 
 	bannerText := input.QrBannerText
@@ -70,15 +98,16 @@ func (uc *RestaurantUseCase) CreateRestaurant(input CreateRestaurantInput) (*ent
 	r := &entity.Restaurant{
 		ID:            uuid.New().String(),
 		Name:          input.Name,
-		Plan:          plan,
+		PlanID:        plan.ID,
 		QrBannerText:  bannerText,
 		QrFooterItems: entity.JSONB(footerItems),
 	}
-
 	if err := uc.restaurantRepo.Create(r); err != nil {
 		return nil, fmt.Errorf("failed to create restaurant: %w", err)
 	}
-
+	// Populate the association for the response only, after persisting, so
+	// GORM does not attempt to upsert the plan row on create.
+	r.Plan = *plan
 	return r, nil
 }
 
@@ -103,8 +132,8 @@ func (uc *RestaurantUseCase) GetAllRestaurants() ([]entity.Restaurant, error) {
 }
 
 type CreateTableInput struct {
-	Number       int    `json:"number" binding:"required"`
-	RestaurantID string `json:"restaurant_id" binding:"required"`
+	Number       int    `json:"number"`
+	RestaurantID string `json:"restaurant_id"`
 }
 
 func (uc *RestaurantUseCase) CreateTable(input CreateTableInput) (*entity.Table, error) {
@@ -112,28 +141,27 @@ func (uc *RestaurantUseCase) CreateTable(input CreateTableInput) (*entity.Table,
 		return nil, fmt.Errorf("restaurant not found: %w", err)
 	}
 
-	if existing, _ := uc.tableRepo.FindByNumberAndRestaurantID(input.Number, input.RestaurantID); existing != nil {
+	existing, err := uc.tableRepo.FindByNumberAndRestaurantID(input.Number, input.RestaurantID)
+	if err == nil && existing != nil {
 		return nil, ErrTableNumberExists
 	}
 
-	qr, err := generateQRCode(10)
+	qrCode, err := generateQRCode(10)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate QR code: %w", err)
 	}
 
-	t := &entity.Table{
+	table := &entity.Table{
 		ID:           uuid.New().String(),
 		Number:       input.Number,
 		RestaurantID: input.RestaurantID,
-		QRCode:       qr,
+		QRCode:       qrCode,
 		IsActive:     true,
 	}
-
-	if err := uc.tableRepo.Create(t); err != nil {
+	if err := uc.tableRepo.Create(table); err != nil {
 		return nil, fmt.Errorf("failed to create table: %w", err)
 	}
-
-	return t, nil
+	return table, nil
 }
 
 func (uc *RestaurantUseCase) GetTables(restaurantID string) ([]entity.Table, error) {
@@ -145,56 +173,46 @@ func (uc *RestaurantUseCase) RegenerateQR(tableID string) (string, error) {
 		return "", fmt.Errorf("table not found: %w", err)
 	}
 
-	newCode, err := generateQRCode(10)
+	qrCode, err := generateQRCode(10)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate QR code: %w", err)
 	}
-
-	if err := uc.tableRepo.UpdateQRCode(tableID, newCode); err != nil {
+	if err := uc.tableRepo.UpdateQRCode(tableID, qrCode); err != nil {
 		return "", fmt.Errorf("failed to update QR code: %w", err)
 	}
 
-	return newCode, nil
+	return qrCode, nil
 }
 
 func (uc *RestaurantUseCase) InactivateTable(restaurantID, tableID string) error {
-	t, err := uc.tableRepo.FindByID(tableID)
+	table, err := uc.tableRepo.FindByID(tableID)
 	if err != nil {
 		return ErrTableNotFound
 	}
-	if t.RestaurantID != restaurantID {
+	if table.RestaurantID != restaurantID {
 		return ErrTableRestaurantMismatch
 	}
-	if err := uc.tableRepo.InactiveTable(tableID); err != nil {
-		return fmt.Errorf("failed to inactivate table: %w", err)
-	}
-	return nil
+	return uc.tableRepo.InactiveTable(tableID)
 }
 
 func (uc *RestaurantUseCase) ActivateTable(restaurantID, tableID string) error {
-	t, err := uc.tableRepo.FindByID(tableID)
+	table, err := uc.tableRepo.FindByID(tableID)
 	if err != nil {
 		return ErrTableNotFound
 	}
-	if t.RestaurantID != restaurantID {
+	if table.RestaurantID != restaurantID {
 		return ErrTableRestaurantMismatch
 	}
-	if err := uc.tableRepo.ReactiVateTable(tableID); err != nil {
-		return fmt.Errorf("failed to activate table: %w", err)
-	}
-	return nil
+	return uc.tableRepo.ReactiVateTable(tableID)
 }
 
 func (uc *RestaurantUseCase) DeleteTable(restaurantID, tableID string) error {
-	t, err := uc.tableRepo.FindByID(tableID)
+	table, err := uc.tableRepo.FindByID(tableID)
 	if err != nil {
 		return ErrTableNotFound
 	}
-	if t.RestaurantID != restaurantID {
+	if table.RestaurantID != restaurantID {
 		return ErrTableRestaurantMismatch
 	}
-	if err := uc.tableRepo.DeleteByID(tableID); err != nil {
-		return fmt.Errorf("failed to delete table: %w", err)
-	}
-	return nil
+	return uc.tableRepo.DeleteByID(tableID)
 }

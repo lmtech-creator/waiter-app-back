@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/waiter/back/domain/entity"
@@ -49,6 +50,88 @@ func (m *RestaurantRepo) FindAll() ([]entity.Restaurant, error) {
 		list = append(list, *r)
 	}
 	return list, nil
+}
+
+// --- PlanRepository Mock ---
+
+type PlanRepo struct {
+	Plans              map[string]*entity.Plan
+	CreateFn           func(p *entity.Plan) error
+	FindByIDFn         func(id string) (*entity.Plan, error)
+	FindByNameFn       func(name string) (*entity.Plan, error)
+	FindAllFn          func() ([]entity.Plan, error)
+	UpdateFn           func(p *entity.Plan) error
+	DeleteByIDFn       func(id string) error
+	CountRestaurantsFn func(planID string) (int64, error)
+}
+
+func NewPlanRepo() *PlanRepo {
+	return &PlanRepo{Plans: make(map[string]*entity.Plan)}
+}
+
+func (m *PlanRepo) Create(p *entity.Plan) error {
+	if m.CreateFn != nil {
+		return m.CreateFn(p)
+	}
+	m.Plans[p.ID] = p
+	return nil
+}
+
+func (m *PlanRepo) FindByID(id string) (*entity.Plan, error) {
+	if m.FindByIDFn != nil {
+		return m.FindByIDFn(id)
+	}
+	p, ok := m.Plans[id]
+	if !ok {
+		return nil, fmt.Errorf("plan not found")
+	}
+	return p, nil
+}
+
+func (m *PlanRepo) FindByName(name string) (*entity.Plan, error) {
+	if m.FindByNameFn != nil {
+		return m.FindByNameFn(name)
+	}
+	for _, p := range m.Plans {
+		if strings.EqualFold(p.Name, name) {
+			return p, nil
+		}
+	}
+	return nil, fmt.Errorf("plan not found")
+}
+
+func (m *PlanRepo) FindAll() ([]entity.Plan, error) {
+	if m.FindAllFn != nil {
+		return m.FindAllFn()
+	}
+	var list []entity.Plan
+	for _, p := range m.Plans {
+		list = append(list, *p)
+	}
+	return list, nil
+}
+
+func (m *PlanRepo) Update(p *entity.Plan) error {
+	if m.UpdateFn != nil {
+		return m.UpdateFn(p)
+	}
+	m.Plans[p.ID] = p
+	return nil
+}
+
+func (m *PlanRepo) DeleteByID(id string) error {
+	if m.DeleteByIDFn != nil {
+		return m.DeleteByIDFn(id)
+	}
+	delete(m.Plans, id)
+	return nil
+}
+
+func (m *PlanRepo) CountRestaurants(planID string) (int64, error) {
+	if m.CountRestaurantsFn != nil {
+		return m.CountRestaurantsFn(planID)
+	}
+	return 0, nil
 }
 
 // --- TableRepository Mock ---

@@ -82,15 +82,44 @@ Errores: `400` · `401`
 ### `POST /restaurants` — Crear restaurante _(superadmin)_
 
 ```json
-// Request
-{ "name": "La Trattoria", "plan": "pro" }
+// Request (plan_id preferido; plan acepta el nombre por compatibilidad)
+{ "name": "La Trattoria", "plan_id": "uuid" }
 
 // 201
-{ "id": "uuid", "name": "La Trattoria", "plan": "pro", "qr_banner_text": "Escaneá y llamá al mozo", "qr_footer_items": ["Llamar al mozo", "Pedir la cuenta", "Dejar reseña"] }
+{ "id": "uuid", "name": "La Trattoria", "plan_id": "uuid", "plan": "pro", "qr_banner_text": "Escaneá y llamá al mozo", "qr_footer_items": ["Llamar al mozo", "Pedir la cuenta", "Dejar reseña"] }
 ```
 
 Campos QR opcionales: `qr_banner_text` (max 100 chars), `qr_footer_items` (array 1-5 items, cada uno max 50 chars).  
-Errores: `400` · `422`
+Errores: `400` · `404` plan inexistente · `422`
+
+### `GET /plans` — Listar planes _(superadmin)_
+
+### `POST /plans` — Crear plan _(superadmin)_
+
+```json
+// Request
+{ "name": "pro", "description": "Plan profesional" }
+
+// 201
+{ "id": "uuid", "name": "pro", "description": "Plan profesional" }
+```
+
+Errores: `409` nombre duplicado · `422` nombre requerido
+
+### `GET /plans/:planId` — Obtener plan _(superadmin)_
+
+### `PATCH /plans/:planId` — Actualizar plan _(superadmin)_
+
+```json
+// Request (campos opcionales)
+{ "name": "premium", "description": "..." }
+```
+
+Errores: `404` · `409` nombre duplicado · `422` nombre vacío
+
+### `DELETE /plans/:planId` — Eliminar plan _(superadmin)_
+
+Errores: `404` · `409` plan asignado a restaurantes
 
 ### `GET /restaurants/:restaurantId` — Obtener restaurante _(superadmin, owner)_
 
@@ -106,7 +135,7 @@ Errores: `400` · `422`
 
 Errores: `409` duplicado · `422`
 
-### `GET /restaurants/:restaurantId/tables` — Listar mesas _(superadmin, owner)_
+### `GET /restaurants/:restaurantId/tables` — Listar mesas _(superadmin, owner, employee)_
 
 ### `POST /restaurants/:restaurantId/tables/:id/inactivate` — Inactivar mesa _(superadmin, owner)_
 

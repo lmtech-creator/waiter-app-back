@@ -25,9 +25,20 @@ type TablePublic struct {
 
 type CreateRestaurantRequest struct {
 	Name          string   `json:"name" binding:"required"`
+	PlanID        string   `json:"plan_id"`
 	Plan          string   `json:"plan"`
 	QrBannerText  string   `json:"qr_banner_text"`
 	QrFooterItems []string `json:"qr_footer_items"`
+}
+
+type CreatePlanRequest struct {
+	Name        string `json:"name" binding:"required"`
+	Description string `json:"description"`
+}
+
+type UpdatePlanRequest struct {
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 type CreateTableRequest struct {
@@ -54,9 +65,16 @@ type CreateFeedbackRequest struct {
 type RestaurantResponse struct {
 	ID            string   `json:"id"`
 	Name          string   `json:"name"`
+	PlanID        string   `json:"plan_id"`
 	Plan          string   `json:"plan"`
 	QrBannerText  string   `json:"qr_banner_text"`
 	QrFooterItems []string `json:"qr_footer_items"`
+}
+
+type PlanResponse struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 type TableResponse struct {
@@ -151,13 +169,30 @@ func ToRestaurantResponse(r *entity.Restaurant) RestaurantResponse {
 	if footer == nil {
 		footer = []string{}
 	}
+	planName := r.Plan.Name
+	if planName == "" {
+		planName = r.PlanID
+	}
 	return RestaurantResponse{
 		ID:            r.ID,
 		Name:          r.Name,
-		Plan:          r.Plan,
+		PlanID:        r.PlanID,
+		Plan:          planName,
 		QrBannerText:  r.QrBannerText,
 		QrFooterItems: footer,
 	}
+}
+
+func ToPlanResponse(p *entity.Plan) PlanResponse {
+	return PlanResponse{ID: p.ID, Name: p.Name, Description: p.Description}
+}
+
+func ToPlanListResponse(plans []entity.Plan) []PlanResponse {
+	out := make([]PlanResponse, len(plans))
+	for i, p := range plans {
+		out[i] = ToPlanResponse(&p)
+	}
+	return out
 }
 
 func ToTableResponse(t *entity.Table) TableResponse {

@@ -29,12 +29,19 @@ func (j *JSONB) Scan(src interface{}) error {
 	return json.Unmarshal(bytes, j)
 }
 
+type Plan struct {
+	ID          string `json:"id" gorm:"primaryKey;type:uuid"`
+	Name        string `json:"name" gorm:"not null;uniqueIndex"`
+	Description string `json:"description" gorm:"not null;default:''"`
+}
+
 type Restaurant struct {
-	ID            string   `json:"id" gorm:"primaryKey;type:uuid"`
-	Name          string   `json:"name" gorm:"not null"`
-	Plan          string   `json:"plan" gorm:"not null;default:free"`
-	QrBannerText  string   `json:"qr_banner_text" gorm:"not null;default:''"`
-	QrFooterItems JSONB    `json:"qr_footer_items" gorm:"type:jsonb;not null;default:'[]'"`
+	ID            string `json:"id" gorm:"primaryKey;type:uuid"`
+	Name          string `json:"name" gorm:"not null"`
+	PlanID        string `json:"plan_id" gorm:"type:uuid;not null;index"`
+	Plan          Plan   `json:"plan_detail,omitempty" gorm:"foreignKey:PlanID;references:ID"`
+	QrBannerText  string `json:"qr_banner_text" gorm:"not null;default:''"`
+	QrFooterItems JSONB  `json:"qr_footer_items" gorm:"type:jsonb;not null;default:'[]'"`
 }
 
 type Table struct {

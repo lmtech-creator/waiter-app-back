@@ -8,7 +8,12 @@ import (
 )
 
 func TestToRestaurantResponse(t *testing.T) {
-	r := &entity.Restaurant{ID: "r1", Name: "Pizza House", Plan: "premium"}
+	r := &entity.Restaurant{
+		ID:     "r1",
+		Name:   "Pizza House",
+		PlanID: "p1",
+		Plan:   entity.Plan{ID: "p1", Name: "premium"},
+	}
 	resp := ToRestaurantResponse(r)
 
 	if resp.ID != "r1" {
@@ -16,6 +21,9 @@ func TestToRestaurantResponse(t *testing.T) {
 	}
 	if resp.Name != "Pizza House" {
 		t.Errorf("expected name 'Pizza House', got %s", resp.Name)
+	}
+	if resp.PlanID != "p1" {
+		t.Errorf("expected plan_id 'p1', got %s", resp.PlanID)
 	}
 	if resp.Plan != "premium" {
 		t.Errorf("expected plan 'premium', got %s", resp.Plan)

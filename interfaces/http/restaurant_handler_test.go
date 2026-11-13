@@ -15,16 +15,18 @@ import (
 	"github.com/waiter/back/mocks"
 )
 
-func setupRestaurantRouter() (*RestaurantHandler, *mocks.RestaurantRepo, *mocks.TableRepo) {
+func setupRestaurantRouter() (*RestaurantHandler, *mocks.RestaurantRepo, *mocks.TableRepo, *mocks.PlanRepo) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
-	uc := usecase.NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := mocks.NewPlanRepo()
+	planRepo.Plans["plan-free"] = &entity.Plan{ID: "plan-free", Name: "free", Description: "Plan gratuito"}
+	uc := usecase.NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 	handler := NewRestaurantHandler(uc)
-	return handler, restaurantRepo, tableRepo
+	return handler, restaurantRepo, tableRepo, planRepo
 }
 
 func TestRestaurantHandler_Create_Success(t *testing.T) {
-	handler, _, _ := setupRestaurantRouter()
+	handler, _, _, _ := setupRestaurantRouter()
 
 	body, _ := json.Marshal(map[string]any{"name": "Burger Place"})
 	w := httptest.NewRecorder()
@@ -44,6 +46,9 @@ func TestRestaurantHandler_Create_Success(t *testing.T) {
 	if resp.Name != "Burger Place" {
 		t.Errorf("expected name 'Burger Place', got %s", resp.Name)
 	}
+	if resp.Plan != "free" || resp.PlanID != "plan-free" {
+		t.Errorf("expected default plan free (plan-free), got plan=%q plan_id=%q", resp.Plan, resp.PlanID)
+	}
 	if resp.QrBannerText != "Escaneá y llamá al mozo" {
 		t.Errorf("expected default qr_banner_text, got %q", resp.QrBannerText)
 	}
@@ -53,7 +58,7 @@ func TestRestaurantHandler_Create_Success(t *testing.T) {
 }
 
 func TestRestaurantHandler_Create_WithCustomQR(t *testing.T) {
-	handler, _, _ := setupRestaurantRouter()
+	handler, _, _, _ := setupRestaurantRouter()
 
 	body, _ := json.Marshal(map[string]any{
 		"name":           "QR Place",
@@ -86,7 +91,7 @@ func TestRestaurantHandler_Create_WithCustomQR(t *testing.T) {
 }
 
 func TestRestaurantHandler_Create_BadJSON(t *testing.T) {
-	handler, _, _ := setupRestaurantRouter()
+	handler, _, _, _ := setupRestaurantRouter()
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -101,7 +106,7 @@ func TestRestaurantHandler_Create_BadJSON(t *testing.T) {
 }
 
 func TestRestaurantHandler_Create_InvalidBannerText(t *testing.T) {
-	handler, _, _ := setupRestaurantRouter()
+	handler, _, _, _ := setupRestaurantRouter()
 
 	body, _ := json.Marshal(map[string]any{
 		"name":           "Test",
@@ -120,7 +125,7 @@ func TestRestaurantHandler_Create_InvalidBannerText(t *testing.T) {
 }
 
 func TestRestaurantHandler_Create_InvalidFooterItems(t *testing.T) {
-	handler, _, _ := setupRestaurantRouter()
+	handler, _, _, _ := setupRestaurantRouter()
 
 	body, _ := json.Marshal(map[string]any{
 		"name":            "Test",
@@ -139,7 +144,7 @@ func TestRestaurantHandler_Create_InvalidFooterItems(t *testing.T) {
 }
 
 func TestRestaurantHandler_Create_UseCaseError(t *testing.T) {
-	handler, restaurantRepo, _ := setupRestaurantRouter()
+	handler, restaurantRepo, _, _ := setupRestaurantRouter()
 	restaurantRepo.CreateFn = func(r *entity.Restaurant) error {
 		return fmt.Errorf("db error")
 	}
@@ -158,9 +163,9 @@ func TestRestaurantHandler_Create_UseCaseError(t *testing.T) {
 }
 
 func TestRestaurantHandler_Get_Success(t *testing.T) {
-	handler, restaurantRepo, _ := setupRestaurantRouter()
+	handler, restaurantRepo, _, _ := setupRestaurantRouter()
 	restaurantRepo.Restaurants["r1"] = &entity.Restaurant{
-		ID: "r1", Name: "Sushi Bar", Plan: "free",
+		ID: "r1", Name: "Sushi Bar", PlanID: "plan-free", Plan: entity.Plan{ID: "plan-free", Name: "free"},
 		QrBannerText: "Escaneá!", QrFooterItems: entity.JSONB{"Llamar", "Cuenta"},
 	}
 
@@ -190,7 +195,7 @@ func TestRestaurantHandler_Get_Success(t *testing.T) {
 }
 
 func TestRestaurantHandler_Get_NotFound(t *testing.T) {
-	handler, _, _ := setupRestaurantRouter()
+	handler, _, _, _ := setupRestaurantRouter()
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -205,7 +210,7 @@ func TestRestaurantHandler_Get_NotFound(t *testing.T) {
 }
 
 func TestRestaurantHandler_CreateTable_Success(t *testing.T) {
-	handler, restaurantRepo, _ := setupRestaurantRouter()
+	handler, restaurantRepo, _, _ := setupRestaurantRouter()
 	restaurantRepo.Restaurants["r1"] = &entity.Restaurant{ID: "r1", Name: "Test"}
 
 	body, _ := json.Marshal(map[string]any{"number": 3})
@@ -230,7 +235,7 @@ func TestRestaurantHandler_CreateTable_Success(t *testing.T) {
 }
 
 func TestRestaurantHandler_CreateTable_BadJSON(t *testing.T) {
-	handler, _, _ := setupRestaurantRouter()
+	handler, _, _, _ := setupRestaurantRouter()
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -246,7 +251,7 @@ func TestRestaurantHandler_CreateTable_BadJSON(t *testing.T) {
 }
 
 func TestRestaurantHandler_CreateTable_RestaurantNotFound(t *testing.T) {
-	handler, _, _ := setupRestaurantRouter()
+	handler, _, _, _ := setupRestaurantRouter()
 
 	body, _ := json.Marshal(map[string]any{"number": 1})
 	w := httptest.NewRecorder()
@@ -263,7 +268,7 @@ func TestRestaurantHandler_CreateTable_RestaurantNotFound(t *testing.T) {
 }
 
 func TestRestaurantHandler_GetTables_Success(t *testing.T) {
-	handler, _, tableRepo := setupRestaurantRouter()
+	handler, _, tableRepo, _ := setupRestaurantRouter()
 	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1", Number: 1}
 	tableRepo.Tables["t2"] = &entity.Table{ID: "t2", RestaurantID: "r1", Number: 2}
 
@@ -287,7 +292,7 @@ func TestRestaurantHandler_GetTables_Success(t *testing.T) {
 }
 
 func TestRestaurantHandler_GetTables_RepoError(t *testing.T) {
-	handler, _, tableRepo := setupRestaurantRouter()
+	handler, _, tableRepo, _ := setupRestaurantRouter()
 	tableRepo.FindByRestaurantFn = func(restaurantID string) ([]entity.Table, error) {
 		return nil, fmt.Errorf("db error")
 	}
@@ -305,7 +310,7 @@ func TestRestaurantHandler_GetTables_RepoError(t *testing.T) {
 }
 
 func TestRestaurantHandler_RegenerateQR_Success(t *testing.T) {
-	handler, _, tableRepo := setupRestaurantRouter()
+	handler, _, tableRepo, _ := setupRestaurantRouter()
 	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", Number: 1, QRCode: "OLDCODE123"}
 
 	w := httptest.NewRecorder()
@@ -328,7 +333,7 @@ func TestRestaurantHandler_RegenerateQR_Success(t *testing.T) {
 }
 
 func TestRestaurantHandler_RegenerateQR_NotFound(t *testing.T) {
-	handler, _, _ := setupRestaurantRouter()
+	handler, _, _, _ := setupRestaurantRouter()
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -343,7 +348,7 @@ func TestRestaurantHandler_RegenerateQR_NotFound(t *testing.T) {
 }
 
 func TestRestaurantHandler_RegenerateQR_UpdateError(t *testing.T) {
-	handler, _, tableRepo := setupRestaurantRouter()
+	handler, _, tableRepo, _ := setupRestaurantRouter()
 	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", QRCode: "OLD1234567"}
 	tableRepo.UpdateQRCodeFn = func(id, qrCode string) error {
 		return fmt.Errorf("db error")
@@ -362,7 +367,7 @@ func TestRestaurantHandler_RegenerateQR_UpdateError(t *testing.T) {
 }
 
 func TestRestaurantHandler_InactivateTable_Success(t *testing.T) {
-	handler, _, tableRepo := setupRestaurantRouter()
+	handler, _, tableRepo, _ := setupRestaurantRouter()
 	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1", IsActive: true}
 
 	w := httptest.NewRecorder()
@@ -381,7 +386,7 @@ func TestRestaurantHandler_InactivateTable_Success(t *testing.T) {
 }
 
 func TestRestaurantHandler_InactivateTable_NotFound(t *testing.T) {
-	handler, _, _ := setupRestaurantRouter()
+	handler, _, _, _ := setupRestaurantRouter()
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -396,7 +401,7 @@ func TestRestaurantHandler_InactivateTable_NotFound(t *testing.T) {
 }
 
 func TestRestaurantHandler_ActivateTable_Success(t *testing.T) {
-	handler, _, tableRepo := setupRestaurantRouter()
+	handler, _, tableRepo, _ := setupRestaurantRouter()
 	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1", IsActive: false}
 
 	w := httptest.NewRecorder()
@@ -415,7 +420,7 @@ func TestRestaurantHandler_ActivateTable_Success(t *testing.T) {
 }
 
 func TestRestaurantHandler_ActivateTable_Mismatch(t *testing.T) {
-	handler, _, tableRepo := setupRestaurantRouter()
+	handler, _, tableRepo, _ := setupRestaurantRouter()
 	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r2", IsActive: false}
 
 	w := httptest.NewRecorder()

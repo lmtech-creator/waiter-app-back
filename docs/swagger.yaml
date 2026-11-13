@@ -56,6 +56,15 @@ definitions:
     - score
     - table_id
     type: object
+  dto.CreatePlanRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+    required:
+    - name
+    type: object
   dto.CreateRequestRequest:
     properties:
       type:
@@ -68,6 +77,8 @@ definitions:
       name:
         type: string
       plan:
+        type: string
+      plan_id:
         type: string
       qr_banner_text:
         type: string
@@ -123,6 +134,15 @@ definitions:
       hour:
         type: integer
     type: object
+  dto.PlanResponse:
+    properties:
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
   dto.RequestResponse:
     properties:
       created_at:
@@ -148,6 +168,8 @@ definitions:
       name:
         type: string
       plan:
+        type: string
+      plan_id:
         type: string
       qr_banner_text:
         type: string
@@ -194,6 +216,8 @@ definitions:
     properties:
       id:
         type: string
+      is_active:
+        type: boolean
       number:
         type: integer
       qr_code:
@@ -206,6 +230,13 @@ definitions:
       password:
         type: string
       username:
+        type: string
+    type: object
+  dto.UpdatePlanRequest:
+    properties:
+      description:
+        type: string
+      name:
         type: string
     type: object
   dto.UpdateRequestStatusRequest:
@@ -495,6 +526,149 @@ paths:
       summary: Registrar feedback
       tags:
       - feedback
+  /api/v1/plans:
+    get:
+      description: Retorna todos los planes configurables (solo superadmin)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.PlanResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Listar planes
+      tags:
+      - restaurants
+    post:
+      consumes:
+      - application/json
+      description: Crea un nuevo plan configurable (solo superadmin)
+      parameters:
+      - description: Datos del plan
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreatePlanRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.PlanResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Crear plan
+      tags:
+      - restaurants
+  /api/v1/plans/{planId}:
+    delete:
+      description: Elimina un plan configurable si no está en uso (solo superadmin)
+      parameters:
+      - description: ID del plan
+        in: path
+        name: planId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Plan eliminado
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Eliminar plan
+      tags:
+      - restaurants
+    get:
+      description: Retorna un plan por su ID (solo superadmin)
+      parameters:
+      - description: ID del plan
+        in: path
+        name: planId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PlanResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Obtener plan
+      tags:
+      - restaurants
+    patch:
+      consumes:
+      - application/json
+      description: Actualiza un plan configurable (solo superadmin)
+      parameters:
+      - description: ID del plan
+        in: path
+        name: planId
+        required: true
+        type: string
+      - description: Datos a actualizar
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdatePlanRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.PlanResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Actualizar plan
+      tags:
+      - restaurants
   /api/v1/requests:
     post:
       consumes:
@@ -544,6 +718,37 @@ paths:
       tags:
       - requests
   /api/v1/requests/{requestId}:
+    get:
+      description: Retorna una solicitud de la mesa de la sesión; el cliente lo usa
+        para saber cuándo fue atendida.
+      parameters:
+      - description: ID de la solicitud
+        in: path
+        name: requestId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.RequestResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - SessionToken: []
+      summary: Obtener estado de una solicitud
+      tags:
+      - requests
     patch:
       consumes:
       - application/json
@@ -815,6 +1020,45 @@ paths:
       security:
       - AdminToken: []
       summary: Crear mesa
+      tags:
+      - tables
+  /api/v1/restaurants/{restaurantId}/tables/{id}:
+    delete:
+      description: Elimina una mesa del restaurante. La operación es irreversible.
+      parameters:
+      - description: ID del restaurante
+        in: path
+        name: restaurantId
+        required: true
+        type: string
+      - description: ID de la mesa
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      security:
+      - AdminToken: []
+      summary: Eliminar mesa
       tags:
       - tables
   /api/v1/restaurants/{restaurantId}/tables/{id}/activate:

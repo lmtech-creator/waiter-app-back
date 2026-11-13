@@ -6,6 +6,16 @@ import (
 	"github.com/waiter/back/domain/entity"
 )
 
+type PlanRepository interface {
+	Create(plan *entity.Plan) error
+	FindByID(id string) (*entity.Plan, error)
+	FindByName(name string) (*entity.Plan, error)
+	FindAll() ([]entity.Plan, error)
+	Update(plan *entity.Plan) error
+	DeleteByID(id string) error
+	CountRestaurants(planID string) (int64, error)
+}
+
 type RestaurantRepository interface {
 	Create(restaurant *entity.Restaurant) error
 	FindByID(id string) (*entity.Restaurant, error)

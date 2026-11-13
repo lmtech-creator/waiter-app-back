@@ -17,6 +17,7 @@ func SetupRouter(
 	sessionHandler *SessionHandler,
 	adminHandler *AdminHandler,
 	statsHandler *StatsHandler,
+	planHandler *PlanHandler,
 	hub *ws.Hub,
 	secret []byte,
 	adminSecret []byte,
@@ -71,6 +72,11 @@ func SetupRouter(
 		{
 			superadmin.GET("/restaurants", restaurantHandler.GetAll)
 			superadmin.POST("/restaurants", restaurantHandler.Create)
+			superadmin.GET("/plans", planHandler.GetAll)
+			superadmin.POST("/plans", planHandler.Create)
+			superadmin.GET("/plans/:planId", planHandler.Get)
+			superadmin.PATCH("/plans/:planId", planHandler.Update)
+			superadmin.DELETE("/plans/:planId", planHandler.Delete)
 		}
 
 		// ── User management: superadmin can do everything; owner can manage
@@ -92,21 +98,24 @@ func SetupRouter(
 		{
 			ownerOrAbove.GET("/restaurants/:restaurantId", restaurantHandler.Get)
 			ownerOrAbove.POST("/restaurants/:restaurantId/tables", restaurantHandler.CreateTable)
-			ownerOrAbove.GET("/restaurants/:restaurantId/tables", restaurantHandler.GetTables)
 			ownerOrAbove.POST("/restaurants/:restaurantId/tables/:id/inactivate", restaurantHandler.InactivateTable)
 			ownerOrAbove.POST("/restaurants/:restaurantId/tables/:id/activate", restaurantHandler.ActivateTable)
 			ownerOrAbove.DELETE("/restaurants/:restaurantId/tables/:id", restaurantHandler.DeleteTable)
 			ownerOrAbove.POST("/admin/tables/:id/regenerate-qr", restaurantHandler.RegenerateQR)
 			ownerOrAbove.GET("/restaurants/:restaurantId/feedback", feedbackHandler.GetByRestaurant)
-			ownerOrAbove.GET("/restaurants/:restaurantId/stats", statsHandler.Get)
 		}
 
 		// ── Employee + Owner + Superadmin (operational routes) ───────────────
+		// Waiters need to see table numbers and live requests to do their job,
+		// and the sidebar exposes Mesas/Estadísticas to them. Table mutations,
+		// feedback and restaurant management stay owner-only above.
 		operational := adminBase.Group("")
 		operational.Use(mw.RequireRole(entity.RoleEmployee, entity.RoleOwner, entity.RoleSuperAdmin))
 		operational.Use(mw.RequireRestaurantScope())
 		{
 			operational.GET("/restaurants/:restaurantId/requests/active", requestHandler.GetActive)
+			operational.GET("/restaurants/:restaurantId/tables", restaurantHandler.GetTables)
+			operational.GET("/restaurants/:restaurantId/stats", statsHandler.Get)
 		}
 
 		// Complete request: available to all admin roles

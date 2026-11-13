@@ -21,6 +21,7 @@ func NewDatabase(dsn string) (*gorm.DB, error) {
 	slog.Info("connected to database")
 
 	if err := db.AutoMigrate(
+		&entity.Plan{},
 		&entity.Restaurant{},
 		&entity.Table{},
 		&entity.Request{},

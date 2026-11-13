@@ -27,7 +27,8 @@ cmd/server/main.go     → wiring completo
 
 | Entidad      | Campos clave                                                          |
 | ------------ | --------------------------------------------------------------------- |
-| `Restaurant` | `id`, `name`, `plan`, `qr_banner_text`, `qr_footer_items`              |
+| `Restaurant` | `id`, `name`, `plan_id`, `qr_banner_text`, `qr_footer_items`          |
+| `Plan`       | `id`, `name` (único), `description`                                   |
 | `Table`      | `id`, `number`, `restaurant_id`, `qr_code`, `is_active`               |
 | `Request`    | `id`, `table_id`, `type`, `status`, `created_at`                      |
 | `Feedback`   | `id`, `table_id`, `score` (1–5), `comment`, `created_at`              |
@@ -70,13 +71,20 @@ AdminRole:     superadmin | owner | employee
 | `POST`   | `/admin/login`                               | público                                                 |
 | `GET`    | `/restaurants`                               | superadmin                                              |
 | `POST`   | `/restaurants`                               | superadmin                                              |
+| `GET`    | `/plans`                                     | superadmin                                              |
+| `POST`   | `/plans`                                     | superadmin                                              |
+| `GET`    | `/plans/:planId`                             | superadmin                                              |
+| `PATCH`  | `/plans/:planId`                             | superadmin                                              |
+| `DELETE` | `/plans/:planId`                             | superadmin                                              |
 | `GET`    | `/restaurants/:restaurantId`                 | superadmin, owner (propio)                              |
 | `POST`   | `/restaurants/:restaurantId/tables`          | superadmin, owner (propio)                              |
-| `GET`    | `/restaurants/:restaurantId/tables`          | superadmin, owner (propio)                              |
+| `GET`    | `/restaurants/:restaurantId/tables`          | superadmin, owner, employee (propio)                    |
 | `POST`   | `/admin/tables/:id/regenerate-qr`            | superadmin, owner (propio)                              |
 | `POST`   | `/restaurants/:restaurantId/tables/:id/inactivate` | superadmin, owner (propio)                              |
 | `POST`   | `/restaurants/:restaurantId/tables/:id/activate`   | superadmin, owner (propio)                              |
 | `GET`    | `/restaurants/:restaurantId/requests/active` | superadmin, owner, employee (propio)                    |
+| `GET`    | `/restaurants/:restaurantId/stats`           | superadmin, owner, employee (propio)                    |
+| `GET`    | `/restaurants/:restaurantId/feedback`        | superadmin, owner (propio)                              |
 | `PATCH`  | `/requests/:requestId`                       | superadmin, owner, employee                             |
 | `POST`   | `/admin/users`                               | superadmin, owner (solo employees propios)              |
 | `GET`    | `/admin/users`                               | superadmin (todos), owner (propios)                     |
@@ -178,12 +186,55 @@ Respuesta `200`: array de `RestaurantResponse`
 #### `POST /restaurants` — Crear restaurante _(superadmin)_
 
 ```json
-// Request
-{ "name": "La Trattoria", "plan": "pro" }
+// Request (plan_id preferido; plan acepta el nombre por compatibilidad)
+{ "name": "La Trattoria", "plan_id": "uuid" }
 
 // Response 201
-{ "id": "uuid", "name": "La Trattoria", "plan": "pro" }
+{ "id": "uuid", "name": "La Trattoria", "plan_id": "uuid", "plan": "pro" }
 ```
+
+Errores: `404` plan inexistente · `422`
+
+---
+
+#### `GET /plans` — Listar planes _(superadmin)_
+
+Respuesta `200`: array de `{ "id", "name", "description" }`
+
+---
+
+#### `POST /plans` — Crear plan _(superadmin)_
+
+```json
+// Request
+{ "name": "pro", "description": "Plan profesional" }
+
+// Response 201
+{ "id": "uuid", "name": "pro", "description": "Plan profesional" }
+```
+
+Errores: `409` nombre duplicado · `422` nombre requerido
+
+---
+
+#### `GET /plans/:planId` — Obtener plan _(superadmin)_
+
+---
+
+#### `PATCH /plans/:planId` — Actualizar plan _(superadmin)_
+
+```json
+// Request (campos opcionales)
+{ "name": "premium", "description": "..." }
+```
+
+Errores: `404` · `409` nombre duplicado · `422` nombre vacío
+
+---
+
+#### `DELETE /plans/:planId` — Eliminar plan _(superadmin)_
+
+Errores: `404` · `409` plan asignado a restaurantes
 
 ---
 
@@ -205,7 +256,7 @@ Errores: `409` número duplicado · `422`
 
 ---
 
-#### `GET /restaurants/:restaurantId/tables` — Listar mesas _(superadmin, owner)_
+#### `GET /restaurants/:restaurantId/tables` — Listar mesas _(superadmin, owner, employee)_
 
 ---
 

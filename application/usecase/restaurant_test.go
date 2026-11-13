@@ -9,10 +9,17 @@ import (
 	"github.com/waiter/back/mocks"
 )
 
+func seededPlanRepo() *mocks.PlanRepo {
+	pr := mocks.NewPlanRepo()
+	pr.Plans["plan-free"] = &entity.Plan{ID: "plan-free", Name: "free", Description: "Plan gratuito"}
+	return pr
+}
+
 func TestCreateRestaurant_Success(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	r, err := uc.CreateRestaurant(CreateRestaurantInput{Name: "Burger Place"})
 	if err != nil {
@@ -21,8 +28,8 @@ func TestCreateRestaurant_Success(t *testing.T) {
 	if r.Name != "Burger Place" {
 		t.Errorf("expected name 'Burger Place', got %s", r.Name)
 	}
-	if r.Plan != "free" {
-		t.Errorf("expected default plan 'free', got %s", r.Plan)
+	if r.Plan.Name != "free" || r.PlanID != "plan-free" {
+		t.Errorf("expected default plan 'free' (plan-free), got name=%q id=%q", r.Plan.Name, r.PlanID)
 	}
 	if r.ID == "" {
 		t.Error("expected non-empty ID")
@@ -32,21 +39,24 @@ func TestCreateRestaurant_Success(t *testing.T) {
 func TestCreateRestaurant_WithPlan(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	planRepo.Plans["plan-premium"] = &entity.Plan{ID: "plan-premium", Name: "premium"}
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	r, err := uc.CreateRestaurant(CreateRestaurantInput{Name: "Pizza House", Plan: "premium"})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if r.Plan != "premium" {
-		t.Errorf("expected plan 'premium', got %s", r.Plan)
+	if r.Plan.Name != "premium" || r.PlanID != "plan-premium" {
+		t.Errorf("expected plan 'premium', got name=%q id=%q", r.Plan.Name, r.PlanID)
 	}
 }
 
 func TestCreateRestaurant_QRDefaults(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	r, err := uc.CreateRestaurant(CreateRestaurantInput{Name: "Test"})
 	if err != nil {
@@ -66,12 +76,13 @@ func TestCreateRestaurant_QRDefaults(t *testing.T) {
 func TestCreateRestaurant_WithCustomQRFields(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	r, err := uc.CreateRestaurant(CreateRestaurantInput{
 		Name:          "Custom",
 		QrBannerText:  "Bienvenido!",
-		QrFooterItems: []string{"Llamar", "Reseña"},
+		QrFooterItems: []string{"Llamar", "Rese?a"},
 	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -87,7 +98,8 @@ func TestCreateRestaurant_WithCustomQRFields(t *testing.T) {
 func TestCreateRestaurant_InvalidQRBannerText_TooLong(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	_, err := uc.CreateRestaurant(CreateRestaurantInput{
 		Name:         "Test",
@@ -101,7 +113,8 @@ func TestCreateRestaurant_InvalidQRBannerText_TooLong(t *testing.T) {
 func TestCreateRestaurant_InvalidQRFooterItems_TooMany(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	_, err := uc.CreateRestaurant(CreateRestaurantInput{
 		Name:          "Test",
@@ -115,7 +128,8 @@ func TestCreateRestaurant_InvalidQRFooterItems_TooMany(t *testing.T) {
 func TestCreateRestaurant_InvalidQRFooterItems_ItemTooLong(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	_, err := uc.CreateRestaurant(CreateRestaurantInput{
 		Name:          "Test",
@@ -132,7 +146,8 @@ func TestCreateRestaurant_RepoError(t *testing.T) {
 		return fmt.Errorf("db error")
 	}
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	_, err := uc.CreateRestaurant(CreateRestaurantInput{Name: "Test"})
 	if err == nil {
@@ -142,9 +157,10 @@ func TestCreateRestaurant_RepoError(t *testing.T) {
 
 func TestGetRestaurant_Success(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
-	restaurantRepo.Restaurants["r1"] = &entity.Restaurant{ID: "r1", Name: "Sushi Bar", Plan: "free"}
+	restaurantRepo.Restaurants["r1"] = &entity.Restaurant{ID: "r1", Name: "Sushi Bar", PlanID: "plan-free", Plan: entity.Plan{ID: "plan-free", Name: "free"}}
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	r, err := uc.GetRestaurant("r1")
 	if err != nil {
@@ -158,7 +174,8 @@ func TestGetRestaurant_Success(t *testing.T) {
 func TestGetRestaurant_NotFound(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	_, err := uc.GetRestaurant("nonexistent")
 	if err == nil {
@@ -170,7 +187,8 @@ func TestCreateTable_Success(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	restaurantRepo.Restaurants["r1"] = &entity.Restaurant{ID: "r1", Name: "Test"}
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	tbl, err := uc.CreateTable(CreateTableInput{Number: 5, RestaurantID: "r1"})
 	if err != nil {
@@ -196,7 +214,8 @@ func TestCreateTable_Success(t *testing.T) {
 func TestCreateTable_RestaurantNotFound(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	_, err := uc.CreateTable(CreateTableInput{Number: 1, RestaurantID: "nonexistent"})
 	if err == nil {
@@ -211,7 +230,8 @@ func TestCreateTable_RepoError(t *testing.T) {
 	tableRepo.CreateFn = func(t *entity.Table) error {
 		return fmt.Errorf("db error")
 	}
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	_, err := uc.CreateTable(CreateTableInput{Number: 1, RestaurantID: "r1"})
 	if err == nil {
@@ -225,7 +245,8 @@ func TestGetTables_Success(t *testing.T) {
 	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1", Number: 1}
 	tableRepo.Tables["t2"] = &entity.Table{ID: "t2", RestaurantID: "r1", Number: 2}
 	tableRepo.Tables["t3"] = &entity.Table{ID: "t3", RestaurantID: "r2", Number: 1}
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	tables, err := uc.GetTables("r1")
 	if err != nil {
@@ -239,7 +260,8 @@ func TestGetTables_Success(t *testing.T) {
 func TestGetTables_Empty(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	tables, err := uc.GetTables("r99")
 	if err != nil {
@@ -256,7 +278,8 @@ func TestGetTables_RepoError(t *testing.T) {
 	tableRepo.FindByRestaurantFn = func(restaurantID string) ([]entity.Table, error) {
 		return nil, fmt.Errorf("db error")
 	}
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	_, err := uc.GetTables("r1")
 	if err == nil {
@@ -268,7 +291,8 @@ func TestRegenerateQR_Success(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
 	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", QRCode: "OLDQRCODE"}
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	newCode, err := uc.RegenerateQR("t1")
 	if err != nil {
@@ -291,7 +315,8 @@ func TestRegenerateQR_Success(t *testing.T) {
 func TestRegenerateQR_TableNotFound(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	_, err := uc.RegenerateQR("nonexistent")
 	if err == nil {
@@ -306,7 +331,8 @@ func TestRegenerateQR_UpdateError(t *testing.T) {
 	tableRepo.UpdateQRCodeFn = func(id, qrCode string) error {
 		return fmt.Errorf("db error")
 	}
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	_, err := uc.RegenerateQR("t1")
 	if err == nil {
@@ -318,7 +344,8 @@ func TestInactivateTable_Success(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
 	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1", IsActive: true}
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	err := uc.InactivateTable("r1", "t1")
 	if err != nil {
@@ -332,7 +359,8 @@ func TestInactivateTable_Success(t *testing.T) {
 func TestInactivateTable_NotFound(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	err := uc.InactivateTable("r1", "missing")
 	if !errors.Is(err, ErrTableNotFound) {
@@ -344,7 +372,8 @@ func TestInactivateTable_RestaurantMismatch(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
 	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r2", IsActive: true}
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	err := uc.InactivateTable("r1", "t1")
 	if !errors.Is(err, ErrTableRestaurantMismatch) {
@@ -356,7 +385,8 @@ func TestActivateTable_Success(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
 	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1", IsActive: false}
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	err := uc.ActivateTable("r1", "t1")
 	if err != nil {
@@ -374,7 +404,8 @@ func TestActivateTable_RepoError(t *testing.T) {
 	tableRepo.ReactiVateTableFn = func(id string) error {
 		return fmt.Errorf("db error")
 	}
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	err := uc.ActivateTable("r1", "t1")
 	if err == nil {
@@ -386,7 +417,8 @@ func TestDeleteTable_Success(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
 	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r1", IsActive: true}
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	if err := uc.DeleteTable("r1", "t1"); err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -397,7 +429,7 @@ func TestDeleteTable_Success(t *testing.T) {
 }
 
 func TestDeleteTable_NotFound(t *testing.T) {
-	uc := NewRestaurantUseCase(mocks.NewRestaurantRepo(), mocks.NewTableRepo())
+	uc := NewRestaurantUseCase(mocks.NewRestaurantRepo(), mocks.NewTableRepo(), seededPlanRepo())
 
 	err := uc.DeleteTable("r1", "missing")
 	if !errors.Is(err, ErrTableNotFound) {
@@ -409,7 +441,8 @@ func TestDeleteTable_RestaurantMismatch(t *testing.T) {
 	restaurantRepo := mocks.NewRestaurantRepo()
 	tableRepo := mocks.NewTableRepo()
 	tableRepo.Tables["t1"] = &entity.Table{ID: "t1", RestaurantID: "r2", IsActive: true}
-	uc := NewRestaurantUseCase(restaurantRepo, tableRepo)
+	planRepo := seededPlanRepo()
+	uc := NewRestaurantUseCase(restaurantRepo, tableRepo, planRepo)
 
 	err := uc.DeleteTable("r1", "t1")
 	if !errors.Is(err, ErrTableRestaurantMismatch) {
