@@ -75,6 +75,7 @@ go run github.com/swaggo/swag/cmd/swag@latest init -g cmd/server/main.go -o docs
 
 - `entity.JSONB` es un `[]string` con soporte `driver.Valuer`/`sql.Scanner` para columna JSONB en PostgreSQL. Usar `entity.JSONB(slice)` para convertir.
 - Migraciones manuales en `migrations/`. AutoMigrate de GORM no altera columnas existentes; agregar `ALTER TABLE` manual en producción.
+- Excepción: `migrateRestaurantPlanID` (`persistence/database.go`) corre antes de AutoMigrate para agregar `restaurants.plan_id`. AutoMigrate emite `ADD COLUMN ... NOT NULL`, que falla si la tabla ya tiene filas; este paso es idempotente y no-op en bases nuevas.
 
 ## Gotchas
 
