@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"net/url"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/waiter/back/domain/entity"
@@ -13,8 +15,12 @@ import (
 var ErrTableNumberExists = errors.New("table number already exists for this restaurant")
 var ErrTableNotFound = errors.New("table not found")
 var ErrTableRestaurantMismatch = errors.New("table does not belong to restaurant")
+var ErrRestaurantNotFound = errors.New("restaurant not found")
 var ErrInvalidQRBannerText = errors.New("qr_banner_text must be 1-100 characters")
 var ErrInvalidQRFooterItems = errors.New("qr_footer_items must have 1-5 items, each 1-50 characters")
+var ErrInvalidMenuURL = errors.New("menu_url must be a valid http(s) URL")
+
+const maxMenuURLLength = 500
 
 const qrAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
@@ -47,6 +53,7 @@ type CreateRestaurantInput struct {
 	Name          string   `json:"name" binding:"required"`
 	PlanID        string   `json:"plan_id"`
 	Plan          string   `json:"plan"`
+	MenuURL       string   `json:"menu_url"`
 	QrBannerText  string   `json:"qr_banner_text"`
 	QrFooterItems []string `json:"qr_footer_items"`
 }
@@ -79,6 +86,11 @@ func (uc *RestaurantUseCase) CreateRestaurant(input CreateRestaurantInput) (*ent
 		return nil, err
 	}
 
+	menuURL, err := normalizeMenuURL(input.MenuURL)
+	if err != nil {
+		return nil, err
+	}
+
 	bannerText := input.QrBannerText
 	if bannerText == "" {
 		bannerText = "Escaneá y llamá al mozo"
@@ -99,6 +111,7 @@ func (uc *RestaurantUseCase) CreateRestaurant(input CreateRestaurantInput) (*ent
 		ID:            uuid.New().String(),
 		Name:          input.Name,
 		PlanID:        plan.ID,
+		MenuURL:       menuURL,
 		QrBannerText:  bannerText,
 		QrFooterItems: entity.JSONB(footerItems),
 	}
@@ -129,6 +142,45 @@ func (uc *RestaurantUseCase) GetRestaurant(id string) (*entity.Restaurant, error
 
 func (uc *RestaurantUseCase) GetAllRestaurants() ([]entity.Restaurant, error) {
 	return uc.restaurantRepo.FindAll()
+}
+
+// normalizeMenuURL accepts an empty string (no menu configured) or a public
+// http(s) link. Anything else is rejected so the customer page never renders a
+// javascript: or data: URL.
+func normalizeMenuURL(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return "", nil
+	}
+	if len(trimmed) > maxMenuURLLength {
+		return "", ErrInvalidMenuURL
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Host == "" {
+		return "", ErrInvalidMenuURL
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return "", ErrInvalidMenuURL
+	}
+	return trimmed, nil
+}
+
+func (uc *RestaurantUseCase) UpdateRestaurantMenu(id, menuURL string) (*entity.Restaurant, error) {
+	normalized, err := normalizeMenuURL(menuURL)
+	if err != nil {
+		return nil, err
+	}
+
+	restaurant, err := uc.restaurantRepo.FindByID(id)
+	if err != nil {
+		return nil, ErrRestaurantNotFound
+	}
+
+	restaurant.MenuURL = normalized
+	if err := uc.restaurantRepo.Update(restaurant); err != nil {
+		return nil, fmt.Errorf("failed to update restaurant menu: %w", err)
+	}
+	return restaurant, nil
 }
 
 type CreateTableInput struct {

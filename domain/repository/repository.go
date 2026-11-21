@@ -20,6 +20,7 @@ type RestaurantRepository interface {
 	Create(restaurant *entity.Restaurant) error
 	FindByID(id string) (*entity.Restaurant, error)
 	FindAll() ([]entity.Restaurant, error)
+	Update(restaurant *entity.Restaurant) error
 }
 
 type TableRepository interface {

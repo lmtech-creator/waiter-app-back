@@ -17,8 +17,14 @@ import (
 
 func setupSessionHandler() (*SessionHandler, *mocks.TableRepo) {
 	tableRepo := mocks.NewTableRepo()
+	restaurantRepo := mocks.NewRestaurantRepo()
+	restaurantRepo.Restaurants["r1"] = &entity.Restaurant{
+		ID:      "r1",
+		Name:    "República",
+		MenuURL: "https://example.com/menu",
+	}
 	secret := []byte("test-secret-32bytes-long-enough!!")
-	handler := NewSessionHandler(tableRepo, secret)
+	handler := NewSessionHandler(tableRepo, restaurantRepo, secret)
 	return handler, tableRepo
 }
 
@@ -55,6 +61,15 @@ func TestSessionHandler_Create_Success(t *testing.T) {
 	}
 	if resp.Table.Number != 5 {
 		t.Errorf("expected table number 5, got %d", resp.Table.Number)
+	}
+	if resp.Restaurant.ID != "r1" {
+		t.Errorf("expected restaurant id r1, got %q", resp.Restaurant.ID)
+	}
+	if resp.Restaurant.Name != "República" {
+		t.Errorf("expected restaurant name República, got %q", resp.Restaurant.Name)
+	}
+	if resp.Restaurant.MenuURL != "https://example.com/menu" {
+		t.Errorf("expected menu_url, got %q", resp.Restaurant.MenuURL)
 	}
 }
 

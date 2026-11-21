@@ -27,7 +27,7 @@ cmd/server/main.go     → wiring completo
 
 | Entidad      | Campos clave                                                          |
 | ------------ | --------------------------------------------------------------------- |
-| `Restaurant` | `id`, `name`, `plan_id`, `qr_banner_text`, `qr_footer_items`          |
+| `Restaurant` | `id`, `name`, `plan_id`, `menu_url`, `qr_banner_text`, `qr_footer_items` |
 | `Plan`       | `id`, `name` (único), `description`                                   |
 | `Table`      | `id`, `number`, `restaurant_id`, `qr_code`, `is_active`               |
 | `Request`    | `id`, `table_id`, `type`, `status`, `created_at`                      |
@@ -76,7 +76,8 @@ AdminRole:     superadmin | owner | employee
 | `GET`    | `/plans/:planId`                             | superadmin                                              |
 | `PATCH`  | `/plans/:planId`                             | superadmin                                              |
 | `DELETE` | `/plans/:planId`                             | superadmin                                              |
-| `GET`    | `/restaurants/:restaurantId`                 | superadmin, owner (propio)                              |
+| `GET`    | `/restaurants/:restaurantId`                 | superadmin, owner, employee (propio)                    |
+| `PATCH`  | `/restaurants/:restaurantId`                 | superadmin, owner (propio)                              |
 | `POST`   | `/restaurants/:restaurantId/tables`          | superadmin, owner (propio)                              |
 | `GET`    | `/restaurants/:restaurantId/tables`          | superadmin, owner, employee (propio)                    |
 | `POST`   | `/admin/tables/:id/regenerate-qr`            | superadmin, owner (propio)                              |
@@ -117,7 +118,11 @@ AdminRole:     superadmin | owner | employee
 { "qr_code": "ABC12345XY" }
 
 // Response 200
-{ "session_token": "<jwt>", "table": { "number": 3 } }
+{
+  "session_token": "<jwt>",
+  "table": { "id": "uuid", "number": 3 },
+  "restaurant": { "id": "uuid", "name": "República", "menu_url": "https://..." }
+}
 ```
 
 Errores: `400` qr_code vacío · `404` QR no existe

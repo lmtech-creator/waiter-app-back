@@ -88,7 +88,7 @@ func main() {
 	requestHandler := handler.NewRequestHandler(requestUC)
 	feedbackHandler := handler.NewFeedbackHandler(feedbackUC)
 	restaurantHandler := handler.NewRestaurantHandler(restaurantUC)
-	sessionHandler := handler.NewSessionHandler(tableRepo, secret)
+	sessionHandler := handler.NewSessionHandler(tableRepo, restaurantRepo, secret)
 	adminHandler := handler.NewAdminHandler(adminUC)
 	statsHandler := handler.NewStatsHandler(statsUC)
 	planHandler := handler.NewPlanHandler(planUC)

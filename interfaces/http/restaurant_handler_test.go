@@ -61,8 +61,8 @@ func TestRestaurantHandler_Create_WithCustomQR(t *testing.T) {
 	handler, _, _, _ := setupRestaurantRouter()
 
 	body, _ := json.Marshal(map[string]any{
-		"name":           "QR Place",
-		"qr_banner_text": "Escaneá!",
+		"name":            "QR Place",
+		"qr_banner_text":  "Escaneá!",
 		"qr_footer_items": []string{"Llamar", "Cuenta"},
 	})
 	w := httptest.NewRecorder()
@@ -432,5 +432,85 @@ func TestRestaurantHandler_ActivateTable_Mismatch(t *testing.T) {
 
 	if w.Code != http.StatusForbidden {
 		t.Errorf("expected 403, got %d", w.Code)
+	}
+}
+
+func TestRestaurantHandler_UpdateMenu_Success(t *testing.T) {
+	handler, restaurantRepo, _, _ := setupRestaurantRouter()
+	restaurantRepo.Restaurants["r1"] = &entity.Restaurant{ID: "r1", Name: "República"}
+
+	body, _ := json.Marshal(map[string]any{"menu_url": "https://example.com/menu.pdf"})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPatch, "/api/v1/restaurants/r1", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Params = gin.Params{{Key: "restaurantId", Value: "r1"}}
+
+	handler.Update(c)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp dto.RestaurantResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
+	}
+	if resp.MenuURL != "https://example.com/menu.pdf" {
+		t.Errorf("expected updated menu_url, got %q", resp.MenuURL)
+	}
+	if restaurantRepo.Restaurants["r1"].MenuURL != "https://example.com/menu.pdf" {
+		t.Error("expected menu_url to be persisted")
+	}
+}
+
+func TestRestaurantHandler_UpdateMenu_InvalidURL(t *testing.T) {
+	handler, restaurantRepo, _, _ := setupRestaurantRouter()
+	restaurantRepo.Restaurants["r1"] = &entity.Restaurant{ID: "r1", Name: "República"}
+
+	body, _ := json.Marshal(map[string]any{"menu_url": "javascript:alert(1)"})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPatch, "/api/v1/restaurants/r1", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Params = gin.Params{{Key: "restaurantId", Value: "r1"}}
+
+	handler.Update(c)
+
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Errorf("expected 422, got %d", w.Code)
+	}
+}
+
+func TestRestaurantHandler_UpdateMenu_MissingField(t *testing.T) {
+	handler, restaurantRepo, _, _ := setupRestaurantRouter()
+	restaurantRepo.Restaurants["r1"] = &entity.Restaurant{ID: "r1", Name: "República"}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPatch, "/api/v1/restaurants/r1", bytes.NewReader([]byte(`{}`)))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Params = gin.Params{{Key: "restaurantId", Value: "r1"}}
+
+	handler.Update(c)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestRestaurantHandler_UpdateMenu_NotFound(t *testing.T) {
+	handler, _, _, _ := setupRestaurantRouter()
+
+	body, _ := json.Marshal(map[string]any{"menu_url": "https://example.com/menu"})
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPatch, "/api/v1/restaurants/nonexistent", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Params = gin.Params{{Key: "restaurantId", Value: "nonexistent"}}
+
+	handler.Update(c)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", w.Code)
 	}
 }

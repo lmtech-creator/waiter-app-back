@@ -14,8 +14,9 @@ type SessionRequest struct {
 }
 
 type SessionResponse struct {
-	SessionToken string      `json:"session_token"`
-	Table        TablePublic `json:"table"`
+	SessionToken string           `json:"session_token"`
+	Table        TablePublic      `json:"table"`
+	Restaurant   RestaurantPublic `json:"restaurant"`
 }
 
 type TablePublic struct {
@@ -23,12 +24,23 @@ type TablePublic struct {
 	Number int    `json:"number"`
 }
 
+type RestaurantPublic struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	MenuURL string `json:"menu_url"`
+}
+
 type CreateRestaurantRequest struct {
 	Name          string   `json:"name" binding:"required"`
 	PlanID        string   `json:"plan_id"`
 	Plan          string   `json:"plan"`
+	MenuURL       string   `json:"menu_url"`
 	QrBannerText  string   `json:"qr_banner_text"`
 	QrFooterItems []string `json:"qr_footer_items"`
+}
+
+type UpdateRestaurantRequest struct {
+	MenuURL *string `json:"menu_url"`
 }
 
 type CreatePlanRequest struct {
@@ -67,6 +79,7 @@ type RestaurantResponse struct {
 	Name          string   `json:"name"`
 	PlanID        string   `json:"plan_id"`
 	Plan          string   `json:"plan"`
+	MenuURL       string   `json:"menu_url"`
 	QrBannerText  string   `json:"qr_banner_text"`
 	QrFooterItems []string `json:"qr_footer_items"`
 }
@@ -94,12 +107,12 @@ type RequestResponse struct {
 }
 
 type FeedbackResponse struct {
-	ID        string     `json:"id"`
-	TableID   string     `json:"table_id"`
-	RequestID *string    `json:"request_id,omitempty"`
-	Score     int        `json:"score"`
-	Comment   string     `json:"comment,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
+	ID        string    `json:"id"`
+	TableID   string    `json:"table_id"`
+	RequestID *string   `json:"request_id,omitempty"`
+	Score     int       `json:"score"`
+	Comment   string    `json:"comment,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type ErrorResponse struct {
@@ -178,6 +191,7 @@ func ToRestaurantResponse(r *entity.Restaurant) RestaurantResponse {
 		Name:          r.Name,
 		PlanID:        r.PlanID,
 		Plan:          planName,
+		MenuURL:       r.MenuURL,
 		QrBannerText:  r.QrBannerText,
 		QrFooterItems: footer,
 	}

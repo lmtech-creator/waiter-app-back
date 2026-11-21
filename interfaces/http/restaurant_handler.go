@@ -42,6 +42,7 @@ func (h *RestaurantHandler) Create(c *gin.Context) {
 		Name:          req.Name,
 		PlanID:        req.PlanID,
 		Plan:          req.Plan,
+		MenuURL:       req.MenuURL,
 		QrBannerText:  req.QrBannerText,
 		QrFooterItems: req.QrFooterItems,
 	})
@@ -69,6 +70,45 @@ func (h *RestaurantHandler) Get(c *gin.Context) {
 	r, err := h.uc.GetRestaurant(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "not_found", Message: "restaurant not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.ToRestaurantResponse(r))
+}
+
+// Update godoc
+// @Summary      Actualizar restaurante
+// @Description  Actualiza el link público del menú del restaurante
+// @Tags         restaurants
+// @Accept       json
+// @Produce      json
+// @Param        restaurantId  path      string                      true  "ID del restaurante"
+// @Param        request       body      dto.UpdateRestaurantRequest true  "Campos a actualizar"
+// @Success      200           {object}  dto.RestaurantResponse
+// @Failure      400           {object}  dto.ErrorResponse
+// @Failure      404           {object}  dto.ErrorResponse
+// @Failure      422           {object}  dto.ErrorResponse
+// @Security     AdminToken
+// @Router       /api/v1/restaurants/{restaurantId} [patch]
+func (h *RestaurantHandler) Update(c *gin.Context) {
+	id := c.Param("restaurantId")
+
+	var req dto.UpdateRestaurantRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.MenuURL == nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "validation_error", Message: "menu_url es requerido"})
+		return
+	}
+
+	r, err := h.uc.UpdateRestaurantMenu(id, *req.MenuURL)
+	if err != nil {
+		switch {
+		case errors.Is(err, usecase.ErrInvalidMenuURL):
+			c.JSON(http.StatusUnprocessableEntity, dto.ErrorResponse{Error: "unprocessable_entity", Message: "El link del menú debe empezar con http:// o https://"})
+		case errors.Is(err, usecase.ErrRestaurantNotFound):
+			c.JSON(http.StatusNotFound, dto.ErrorResponse{Error: "not_found", Message: "restaurant not found"})
+		default:
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "internal_error", Message: "No se pudo actualizar el restaurante."})
+		}
 		return
 	}
 

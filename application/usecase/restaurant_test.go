@@ -449,3 +449,85 @@ func TestDeleteTable_RestaurantMismatch(t *testing.T) {
 		t.Fatalf("expected ErrTableRestaurantMismatch, got %v", err)
 	}
 }
+
+func TestCreateRestaurant_WithMenuURL(t *testing.T) {
+	uc := NewRestaurantUseCase(mocks.NewRestaurantRepo(), mocks.NewTableRepo(), seededPlanRepo())
+
+	r, err := uc.CreateRestaurant(CreateRestaurantInput{
+		Name:    "República",
+		MenuURL: " https://example.com/menu ",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if r.MenuURL != "https://example.com/menu" {
+		t.Errorf("expected trimmed menu URL, got %q", r.MenuURL)
+	}
+}
+
+func TestCreateRestaurant_InvalidMenuURL(t *testing.T) {
+	uc := NewRestaurantUseCase(mocks.NewRestaurantRepo(), mocks.NewTableRepo(), seededPlanRepo())
+
+	_, err := uc.CreateRestaurant(CreateRestaurantInput{
+		Name:    "República",
+		MenuURL: "javascript:alert(1)",
+	})
+	if !errors.Is(err, ErrInvalidMenuURL) {
+		t.Fatalf("expected ErrInvalidMenuURL, got %v", err)
+	}
+}
+
+func TestUpdateRestaurantMenu_Success(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	restaurantRepo.Restaurants["r1"] = &entity.Restaurant{ID: "r1", Name: "República"}
+	uc := NewRestaurantUseCase(restaurantRepo, mocks.NewTableRepo(), seededPlanRepo())
+
+	r, err := uc.UpdateRestaurantMenu("r1", "https://example.com/menu")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if r.MenuURL != "https://example.com/menu" {
+		t.Errorf("expected menu URL, got %q", r.MenuURL)
+	}
+	if restaurantRepo.Restaurants["r1"].MenuURL != "https://example.com/menu" {
+		t.Error("expected menu URL to be persisted")
+	}
+}
+
+func TestUpdateRestaurantMenu_Clear(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	restaurantRepo.Restaurants["r1"] = &entity.Restaurant{
+		ID:      "r1",
+		Name:    "República",
+		MenuURL: "https://example.com/menu",
+	}
+	uc := NewRestaurantUseCase(restaurantRepo, mocks.NewTableRepo(), seededPlanRepo())
+
+	r, err := uc.UpdateRestaurantMenu("r1", "  ")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if r.MenuURL != "" {
+		t.Errorf("expected empty menu URL, got %q", r.MenuURL)
+	}
+}
+
+func TestUpdateRestaurantMenu_InvalidURL(t *testing.T) {
+	restaurantRepo := mocks.NewRestaurantRepo()
+	restaurantRepo.Restaurants["r1"] = &entity.Restaurant{ID: "r1", Name: "República"}
+	uc := NewRestaurantUseCase(restaurantRepo, mocks.NewTableRepo(), seededPlanRepo())
+
+	_, err := uc.UpdateRestaurantMenu("r1", "ftp://example.com/menu")
+	if !errors.Is(err, ErrInvalidMenuURL) {
+		t.Fatalf("expected ErrInvalidMenuURL, got %v", err)
+	}
+}
+
+func TestUpdateRestaurantMenu_NotFound(t *testing.T) {
+	uc := NewRestaurantUseCase(mocks.NewRestaurantRepo(), mocks.NewTableRepo(), seededPlanRepo())
+
+	_, err := uc.UpdateRestaurantMenu("missing", "https://example.com/menu")
+	if !errors.Is(err, ErrRestaurantNotFound) {
+		t.Fatalf("expected ErrRestaurantNotFound, got %v", err)
+	}
+}

@@ -86,11 +86,26 @@ Errores: `400` · `401`
 { "name": "La Trattoria", "plan_id": "uuid" }
 
 // 201
-{ "id": "uuid", "name": "La Trattoria", "plan_id": "uuid", "plan": "pro", "qr_banner_text": "Escaneá y llamá al mozo", "qr_footer_items": ["Llamar al mozo", "Pedir la cuenta", "Dejar reseña"] }
+{ "id": "uuid", "name": "La Trattoria", "plan_id": "uuid", "plan": "pro", "menu_url": "", "qr_banner_text": "Escaneá y llamá al mozo", "qr_footer_items": ["Llamar al mozo", "Pedir la cuenta", "Dejar reseña"] }
 ```
 
-Campos QR opcionales: `qr_banner_text` (max 100 chars), `qr_footer_items` (array 1-5 items, cada uno max 50 chars).  
+Campos opcionales: `menu_url` (link http/https, max 500 chars), `qr_banner_text` (max 100 chars), `qr_footer_items` (array 1-5 items, cada uno max 50 chars).
+
 Errores: `400` · `404` plan inexistente · `422`
+
+### `PATCH /restaurants/:restaurantId` — Actualizar menú _(superadmin, owner propio)_
+
+```json
+// Request
+{ "menu_url": "https://drive.google.com/..." }
+
+// 200
+{ "id": "uuid", "name": "La Trattoria", "menu_url": "https://drive.google.com/...", ... }
+```
+
+Enviar `""` borra el menú. Solo se aceptan links `http://` o `https://`.
+
+Errores: `400` falta `menu_url` · `403` otro restaurante · `404` · `422` link inválido
 
 ### `GET /plans` — Listar planes _(superadmin)_
 

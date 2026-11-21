@@ -16,6 +16,7 @@ type RestaurantRepo struct {
 	CreateFn    func(r *entity.Restaurant) error
 	FindByIDFn  func(id string) (*entity.Restaurant, error)
 	FindAllFn   func() ([]entity.Restaurant, error)
+	UpdateFn    func(r *entity.Restaurant) error
 }
 
 func NewRestaurantRepo() *RestaurantRepo {
@@ -50,6 +51,14 @@ func (m *RestaurantRepo) FindAll() ([]entity.Restaurant, error) {
 		list = append(list, *r)
 	}
 	return list, nil
+}
+
+func (m *RestaurantRepo) Update(r *entity.Restaurant) error {
+	if m.UpdateFn != nil {
+		return m.UpdateFn(r)
+	}
+	m.Restaurants[r.ID] = r
+	return nil
 }
 
 // --- PlanRepository Mock ---
@@ -265,17 +274,17 @@ func (m *TableRepo) DeleteByID(id string) error {
 // --- RequestRepository Mock ---
 
 type RequestRepo struct {
-	Requests                    map[string]*entity.Request
-	CreateFn                    func(r *entity.Request) error
-	FindByIDFn                  func(id string) (*entity.Request, error)
-	FindActiveFn                func(restaurantID string) ([]entity.Request, error)
-	FindByTableFn               func(tableID string) ([]entity.Request, error)
-	FindLastCreatedByTableFn    func(tableID string) (*entity.Request, error)
-	UpdateStatusFn              func(id string, status entity.RequestStatus) error
-	UpdateCompletedAtFn         func(id string, t time.Time) error
-	CountServedTablesFn         func(restaurantID string, since, until time.Time) (int, error)
-	AvgServiceTimeFn            func(restaurantID string, since, until time.Time) (float64, error)
-	UsageByHourFn               func(restaurantID string, since, until time.Time) ([]repository.HourBucket, error)
+	Requests                 map[string]*entity.Request
+	CreateFn                 func(r *entity.Request) error
+	FindByIDFn               func(id string) (*entity.Request, error)
+	FindActiveFn             func(restaurantID string) ([]entity.Request, error)
+	FindByTableFn            func(tableID string) ([]entity.Request, error)
+	FindLastCreatedByTableFn func(tableID string) (*entity.Request, error)
+	UpdateStatusFn           func(id string, status entity.RequestStatus) error
+	UpdateCompletedAtFn      func(id string, t time.Time) error
+	CountServedTablesFn      func(restaurantID string, since, until time.Time) (int, error)
+	AvgServiceTimeFn         func(restaurantID string, since, until time.Time) (float64, error)
+	UsageByHourFn            func(restaurantID string, since, until time.Time) ([]repository.HourBucket, error)
 }
 
 func NewRequestRepo() *RequestRepo {
@@ -393,10 +402,10 @@ func (m *RequestRepo) FindLastCreatedByTableID(tableID string) (*entity.Request,
 // --- FeedbackRepository Mock ---
 
 type FeedbackRepo struct {
-	Feedbacks       map[string]*entity.Feedback
-	CreateFn        func(f *entity.Feedback) error
-	FindByTableFn   func(tableID string) ([]entity.Feedback, error)
-	FindByRIDFn     func(restaurantID string) ([]entity.Feedback, error)
+	Feedbacks        map[string]*entity.Feedback
+	CreateFn         func(f *entity.Feedback) error
+	FindByTableFn    func(tableID string) ([]entity.Feedback, error)
+	FindByRIDFn      func(restaurantID string) ([]entity.Feedback, error)
 	AvgScoreByHourFn func(restaurantID string, since, until time.Time) ([]repository.ScoreBucket, error)
 }
 

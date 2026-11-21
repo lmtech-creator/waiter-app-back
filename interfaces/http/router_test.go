@@ -49,6 +49,7 @@ func buildTestRouter(t *testing.T) *gin.Engine {
 	notifier := mocks.NewNotifier()
 	feedbackRepo := mocks.NewFeedbackRepo()
 	restaurantRepo := mocks.NewRestaurantRepo()
+	restaurantRepo.Restaurants["r1"] = &entity.Restaurant{ID: "r1", Name: "República"}
 	adminRepo := mocks.NewAdminRepo()
 
 	planRepo := mocks.NewPlanRepo()
@@ -64,7 +65,7 @@ func buildTestRouter(t *testing.T) *gin.Engine {
 	requestHandler := NewRequestHandler(requestUC)
 	feedbackHandler := NewFeedbackHandler(feedbackUC)
 	restaurantHandler := NewRestaurantHandler(restaurantUC)
-	sessionHandler := NewSessionHandler(tableRepo, []byte("test-secret-that-is-long-enough!!"))
+	sessionHandler := NewSessionHandler(tableRepo, restaurantRepo, []byte("test-secret-that-is-long-enough!!"))
 	adminHandler := NewAdminHandler(adminUC)
 	statsHandler := NewStatsHandler(statsUC)
 	planHandler := NewPlanHandler(planUC)
@@ -96,11 +97,12 @@ func TestSetupRouter_RoutesExist(t *testing.T) {
 		"GET:/api/v1/tables/:tableId/status":                           "",
 		"POST:/api/v1/feedback":                                        "",
 		"GET:/api/v1/restaurants/:restaurantId/requests/active":        "",
-		"GET:/api/v1/restaurants/:restaurantId/feedback":              "",
+		"GET:/api/v1/restaurants/:restaurantId/feedback":               "",
 		"PATCH:/api/v1/requests/:requestId":                            "",
 		"POST:/api/v1/restaurants":                                     "",
 		"GET:/api/v1/restaurants":                                      "",
 		"GET:/api/v1/restaurants/:restaurantId":                        "",
+		"PATCH:/api/v1/restaurants/:restaurantId":                      "",
 		"POST:/api/v1/restaurants/:restaurantId/tables":                "",
 		"GET:/api/v1/restaurants/:restaurantId/tables":                 "",
 		"POST:/api/v1/restaurants/:restaurantId/tables/:id/inactivate": "",
@@ -108,16 +110,16 @@ func TestSetupRouter_RoutesExist(t *testing.T) {
 		"DELETE:/api/v1/restaurants/:restaurantId/tables/:id":          "",
 		"POST:/api/v1/admin/tables/:id/regenerate-qr":                  "",
 		"POST:/api/v1/admin/login":                                     "",
-		"POST:/api/v1/admin/users":                                      "",
-		"GET:/api/v1/admin/users":                                       "",
-		"PATCH:/api/v1/admin/users/:id":                                 "",
-		"POST:/api/v1/admin/users/:id/reset-password":                   "",
-		"DELETE:/api/v1/admin/users/:id":                                "",
-		"GET:/api/v1/plans":                                             "",
-		"POST:/api/v1/plans":                                            "",
-		"GET:/api/v1/plans/:planId":                                     "",
-		"PATCH:/api/v1/plans/:planId":                                   "",
-		"DELETE:/api/v1/plans/:planId":                                  "",
+		"POST:/api/v1/admin/users":                                     "",
+		"GET:/api/v1/admin/users":                                      "",
+		"PATCH:/api/v1/admin/users/:id":                                "",
+		"POST:/api/v1/admin/users/:id/reset-password":                  "",
+		"DELETE:/api/v1/admin/users/:id":                               "",
+		"GET:/api/v1/plans":                                            "",
+		"POST:/api/v1/plans":                                           "",
+		"GET:/api/v1/plans/:planId":                                    "",
+		"PATCH:/api/v1/plans/:planId":                                  "",
+		"DELETE:/api/v1/plans/:planId":                                 "",
 		"GET:/api/v1/ws/:restaurantId":                                 "",
 		"GET:/health":                                                  "",
 	}
@@ -144,7 +146,14 @@ func TestSetupRouter_EmployeeReadAccess(t *testing.T) {
 		return w.Code
 	}
 
-	// Waiters must be able to see tables, live requests and stats.
+	// Waiters must be able to see their own restaurant, tables, live requests
+	// and stats.
+	if code := get("/api/v1/restaurants/r1"); code != http.StatusOK {
+		t.Errorf("employee GET own restaurant: expected 200, got %d", code)
+	}
+	if code := get("/api/v1/restaurants/r2"); code != http.StatusForbidden {
+		t.Errorf("employee GET other restaurant: expected 403, got %d", code)
+	}
 	if code := get("/api/v1/restaurants/r1/tables"); code != http.StatusOK {
 		t.Errorf("employee GET tables: expected 200, got %d", code)
 	}
@@ -171,6 +180,31 @@ func TestSetupRouter_EmployeeReadAccess(t *testing.T) {
 	router.ServeHTTP(w, req)
 	if w.Code != http.StatusForbidden {
 		t.Errorf("employee POST tables: expected 403, got %d", w.Code)
+	}
+}
+
+func TestSetupRouter_MenuUpdatePermissions(t *testing.T) {
+	router := buildTestRouter(t)
+	owner := makeRouterToken(t, entity.RoleOwner, "r1")
+	employee := makeRouterToken(t, entity.RoleEmployee, "r1")
+
+	patch := func(path, token string) int {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPatch, path, bytes.NewBufferString(`{"menu_url":"https://example.com/menu"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	if code := patch("/api/v1/restaurants/r1", owner); code != http.StatusOK {
+		t.Errorf("owner PATCH own restaurant: expected 200, got %d", code)
+	}
+	if code := patch("/api/v1/restaurants/r2", owner); code != http.StatusForbidden {
+		t.Errorf("owner PATCH other restaurant: expected 403, got %d", code)
+	}
+	if code := patch("/api/v1/restaurants/r1", employee); code != http.StatusForbidden {
+		t.Errorf("employee PATCH restaurant: expected 403, got %d", code)
 	}
 }
 

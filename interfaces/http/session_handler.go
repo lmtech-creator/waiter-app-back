@@ -15,16 +15,22 @@ import (
 
 // SessionHandler handles customer session creation via QR code.
 type SessionHandler struct {
-	tableRepo   repository.TableRepository
-	secret      []byte
-	signSession func(claims auth.SessionClaims, secret []byte) (string, error)
+	tableRepo      repository.TableRepository
+	restaurantRepo repository.RestaurantRepository
+	secret         []byte
+	signSession    func(claims auth.SessionClaims, secret []byte) (string, error)
 }
 
-func NewSessionHandler(tableRepo repository.TableRepository, secret []byte) *SessionHandler {
+func NewSessionHandler(
+	tableRepo repository.TableRepository,
+	restaurantRepo repository.RestaurantRepository,
+	secret []byte,
+) *SessionHandler {
 	return &SessionHandler{
-		tableRepo:   tableRepo,
-		secret:      secret,
-		signSession: auth.SignSession,
+		tableRepo:      tableRepo,
+		restaurantRepo: restaurantRepo,
+		secret:         secret,
+		signSession:    auth.SignSession,
 	}
 }
 
@@ -64,6 +70,21 @@ func (h *SessionHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// The customer page shows the venue name and its menu link. A missing
+	// restaurant must not block the core service, so fall back to empty fields.
+	restaurant := dto.RestaurantPublic{ID: table.RestaurantID}
+	if h.restaurantRepo != nil {
+		if r, err := h.restaurantRepo.FindByID(table.RestaurantID); err == nil {
+			restaurant.Name = r.Name
+			restaurant.MenuURL = r.MenuURL
+		} else {
+			zap.L().Warn("restaurant not found for table",
+				zap.String("table_id", table.ID),
+				zap.String("restaurant_id", table.RestaurantID),
+			)
+		}
+	}
+
 	claims := auth.SessionClaims{
 		TableID:      table.ID,
 		RestaurantID: table.RestaurantID,
@@ -87,5 +108,6 @@ func (h *SessionHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.SessionResponse{
 		SessionToken: token,
 		Table:        dto.TablePublic{ID: table.ID, Number: table.Number},
+		Restaurant:   restaurant,
 	})
 }

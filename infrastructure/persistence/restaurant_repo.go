@@ -32,3 +32,8 @@ func (r *RestaurantRepo) FindAll() ([]entity.Restaurant, error) {
 	}
 	return restaurants, nil
 }
+
+func (r *RestaurantRepo) Update(restaurant *entity.Restaurant) error {
+	// FindByID preloads Plan; omit it so Save does not upsert the association.
+	return r.db.Omit("Plan").Save(restaurant).Error
+}

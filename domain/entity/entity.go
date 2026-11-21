@@ -40,6 +40,7 @@ type Restaurant struct {
 	Name          string `json:"name" gorm:"not null"`
 	PlanID        string `json:"plan_id" gorm:"type:uuid;not null;index"`
 	Plan          Plan   `json:"plan_detail,omitempty" gorm:"foreignKey:PlanID;references:ID"`
+	MenuURL       string `json:"menu_url" gorm:"not null;default:''"`
 	QrBannerText  string `json:"qr_banner_text" gorm:"not null;default:''"`
 	QrFooterItems JSONB  `json:"qr_footer_items" gorm:"type:jsonb;not null;default:'[]'"`
 }
@@ -69,21 +70,21 @@ const (
 )
 
 type Request struct {
-	ID          string         `json:"id" gorm:"primaryKey;type:uuid"`
-	TableID     string         `json:"table_id" gorm:"type:uuid;not null;index"`
-	Type        RequestType    `json:"type" gorm:"type:varchar(20);not null"`
-	Status      RequestStatus  `json:"status" gorm:"type:varchar(20);not null;default:PENDING"`
-	CreatedAt   time.Time      `json:"created_at" gorm:"autoCreateTime"`
-	CompletedAt *time.Time     `json:"completed_at,omitempty" gorm:"index"`
+	ID          string        `json:"id" gorm:"primaryKey;type:uuid"`
+	TableID     string        `json:"table_id" gorm:"type:uuid;not null;index"`
+	Type        RequestType   `json:"type" gorm:"type:varchar(20);not null"`
+	Status      RequestStatus `json:"status" gorm:"type:varchar(20);not null;default:PENDING"`
+	CreatedAt   time.Time     `json:"created_at" gorm:"autoCreateTime"`
+	CompletedAt *time.Time    `json:"completed_at,omitempty" gorm:"index"`
 }
 
 type Feedback struct {
-	ID        string     `json:"id" gorm:"primaryKey;type:uuid"`
-	TableID   string     `json:"table_id" gorm:"type:uuid;not null;index"`
-	RequestID *string    `json:"request_id,omitempty" gorm:"type:uuid"`
-	Score     int        `json:"score" gorm:"not null"`
-	Comment   string     `json:"comment,omitempty"`
-	CreatedAt time.Time  `json:"created_at" gorm:"autoCreateTime"`
+	ID        string    `json:"id" gorm:"primaryKey;type:uuid"`
+	TableID   string    `json:"table_id" gorm:"type:uuid;not null;index"`
+	RequestID *string   `json:"request_id,omitempty" gorm:"type:uuid"`
+	Score     int       `json:"score" gorm:"not null"`
+	Comment   string    `json:"comment,omitempty"`
+	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
 }
 
 type AdminRole string

@@ -96,7 +96,7 @@ func SetupRouter(
 		ownerOrAbove.Use(mw.RequireRole(entity.RoleOwner, entity.RoleSuperAdmin))
 		ownerOrAbove.Use(mw.RequireRestaurantScope())
 		{
-			ownerOrAbove.GET("/restaurants/:restaurantId", restaurantHandler.Get)
+			ownerOrAbove.PATCH("/restaurants/:restaurantId", restaurantHandler.Update)
 			ownerOrAbove.POST("/restaurants/:restaurantId/tables", restaurantHandler.CreateTable)
 			ownerOrAbove.POST("/restaurants/:restaurantId/tables/:id/inactivate", restaurantHandler.InactivateTable)
 			ownerOrAbove.POST("/restaurants/:restaurantId/tables/:id/activate", restaurantHandler.ActivateTable)
@@ -107,12 +107,15 @@ func SetupRouter(
 
 		// ── Employee + Owner + Superadmin (operational routes) ───────────────
 		// Waiters need to see table numbers and live requests to do their job,
-		// and the sidebar exposes Mesas/Estadísticas to them. Table mutations,
-		// feedback and restaurant management stay owner-only above.
+		// and the sidebar exposes Mesas/Estadísticas to them. They also read
+		// their own restaurant so the panel can always show where they are.
+		// Table mutations, feedback and restaurant management stay owner-only
+		// above.
 		operational := adminBase.Group("")
 		operational.Use(mw.RequireRole(entity.RoleEmployee, entity.RoleOwner, entity.RoleSuperAdmin))
 		operational.Use(mw.RequireRestaurantScope())
 		{
+			operational.GET("/restaurants/:restaurantId", restaurantHandler.Get)
 			operational.GET("/restaurants/:restaurantId/requests/active", requestHandler.GetActive)
 			operational.GET("/restaurants/:restaurantId/tables", restaurantHandler.GetTables)
 			operational.GET("/restaurants/:restaurantId/stats", statsHandler.Get)
